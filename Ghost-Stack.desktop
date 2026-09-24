@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ghost-Stack Toolchain Wizard
+Comment=Modular Development Environment & Toolchain Orchestrator
+Exec=bash -c 'U_HOME="$HOME"; [ -z "$U_HOME" ] && U_HOME="/home/$(id -un)"; LAUNCH="$U_HOME/Desktop/setup-wizard/launch.sh"; [ ! -f "$LAUNCH" ] && LAUNCH="$U_HOME/setup-wizard/launch.sh"; if [ -f "$LAUNCH" ]; then exec "$LAUNCH"; elif command -v ghost-stack >/dev/null 2>&1; then exec ghost-stack; else echo "Error: ghost-stack launcher not found in $U_HOME"; sleep 3; fi'
+Icon=utilities-terminal
+Terminal=false
+Categories=Development;
+StartupNotify=true

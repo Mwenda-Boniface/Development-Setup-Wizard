@@ -36,7 +36,7 @@ cd setup-wizard
 make install
 ```
 
-Once installed, `ghost-stack` (along with its legacy alias `dev-wizard`) is immediately accessible from any terminal window across your system.
+Once installed, `ghost-stack` is immediately accessible from any terminal window across your system.
 
 ---
 

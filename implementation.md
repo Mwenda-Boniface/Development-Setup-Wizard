@@ -23,7 +23,7 @@ graph TD
 
     subgraph Entry_Points["Execution Entry Points"]
         CLI["Global Binary: ghost-stack (~/.local/bin or $PREFIX/bin)"]
-        DESKTOP["Desktop Launcher: Dev-Setup-Wizard.desktop"]
+        DESKTOP["Desktop Launcher: Ghost-Stack.desktop"]
         LAUNCHER["Wrapper Script: launch.sh"]
         ROOT_RUN["Root Run Script: run.sh"]
         MAKE["Makefile (make install / make run)"]

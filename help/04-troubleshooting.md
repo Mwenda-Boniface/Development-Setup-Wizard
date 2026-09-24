@@ -1,7 +1,7 @@
 # 04 // Troubleshooting & FAQ
 
 ## 1. "Untrusted Application Launcher" Warning on Double-Click
-**Issue:** Double-clicking `Dev-Setup-Wizard.desktop` produces a prompt saying *"The desktop file is in an insecure location and not marked as secure"*.
+**Issue:** Double-clicking `Ghost-Stack.desktop` produces a prompt saying *"The desktop file is in an insecure location and not marked as secure"*.
 
 **Solution:**
 XFCE and Thunar require a security checksum metadata attribute. Run:
@@ -10,7 +10,7 @@ ghost-stack install-cli
 ```
 Or execute:
 ```bash
-gio set -t string ~/Desktop/Dev-Setup-Wizard.desktop metadata::xfce-exe-checksum "$(sha256sum ~/Desktop/Dev-Setup-Wizard.desktop | awk '{print $1}')"
+gio set -t string ~/Desktop/Ghost-Stack.desktop metadata::xfce-exe-checksum "$(sha256sum ~/Desktop/Ghost-Stack.desktop | awk '{print $1}')"
 ```
 Or simply click the button **"Mark As Secure And Launch"** on the prompt dialog once.
 

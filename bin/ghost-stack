@@ -64,11 +64,16 @@ else
 fi
 
 # Package manager abstraction (Debian apt vs Termux pkg)
+APT_UPDATED=false
 pkg_install() {
     if [ "$IS_TERMUX" = true ]; then
         pkg install -y "$@" || apt-get install -y "$@"
     else
-        sudo apt update && sudo apt install -y "$@"
+        if [ "$APT_UPDATED" = false ]; then
+            echo -e "${C_GRAY}Synchronizing package repositories (apt update)...${C_RESET}"
+            sudo apt update && APT_UPDATED=true
+        fi
+        sudo apt install -y "$@"
     fi
 }
 
@@ -133,9 +138,9 @@ auto_stamp_desktop() {
         return 0
     fi
     local desktop_targets=(
-        "$CURRENT_HOME/Desktop/Dev-Setup-Wizard.desktop"
-        "$ROOT_DIR/Dev-Setup-Wizard.desktop"
-        "$CURRENT_HOME/.local/share/applications/dev-setup-wizard.desktop"
+        "$CURRENT_HOME/Desktop/Ghost-Stack.desktop"
+        "$ROOT_DIR/Ghost-Stack.desktop"
+        "$CURRENT_HOME/.local/share/applications/ghost-stack.desktop"
     )
     for dt in "${desktop_targets[@]}"; do
         if [ -f "$dt" ] && command -v gio >/dev/null 2>&1; then
@@ -147,6 +152,7 @@ auto_stamp_desktop() {
             fi
         fi
     done
+    rm -f "$CURRENT_HOME/Desktop/Dev-Setup-Wizard.desktop" "$CURRENT_HOME/.local/share/applications/dev-setup-wizard.desktop" 2>/dev/null || true
 }
 auto_stamp_desktop
 
@@ -213,6 +219,7 @@ install_java17() {
 
 check_android_cmdline() { [ -x "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" ]; }
 install_android_cmdline() {
+    check_java21 || check_java17 || install_java21
     echo -e "${C_MINT}Downloading Android Command-Line Tools (sdkmanager)...${C_RESET}"
     mkdir -p "$ANDROID_DIR/cmdline-tools" "$TMP_DIR"
     local zip_file="$TMP_DIR/cmdline-tools.zip"
@@ -220,6 +227,7 @@ install_android_cmdline() {
     unzip -q -o "$zip_file" -d "$TMP_DIR/cmdline-extract"
     mkdir -p "$ANDROID_DIR/cmdline-tools/latest"
     cp -r "$TMP_DIR"/cmdline-extract/cmdline-tools/* "$ANDROID_DIR/cmdline-tools/latest/"
+    chmod +x "$ANDROID_DIR/cmdline-tools/latest/bin/"* 2>/dev/null || true
     rm -rf "$TMP_DIR/cmdline-extract" "$zip_file"
     sync_env
 }
@@ -442,46 +450,60 @@ install_ollama() {
     curl -fsSL https://ollama.com/install.sh | sh
 }
 
+ensure_pip() {
+    if ! command -v pip3 >/dev/null 2>&1 && ! python3 -m pip --version >/dev/null 2>&1; then
+        echo -e "${C_YELLOW}Bootstrapping pip and Python virtual environment tools...${C_RESET}"
+        install_python_env
+    fi
+}
+
 check_core_ai_stack() { python3 -c "import numpy, pandas, scipy, matplotlib" >/dev/null 2>&1; }
 install_core_ai_stack() {
+    ensure_pip
     echo -e "${C_MINT}Installing Core AI Stack (NumPy, Pandas, SciPy, Matplotlib, Seaborn)...${C_RESET}"
-    python3 -m pip install --user --upgrade numpy pandas scipy matplotlib seaborn --break-system-packages || true
+    python3 -m pip install --user --upgrade numpy pandas scipy matplotlib seaborn --break-system-packages
 }
 
 check_pytorch() { python3 -c "import torch, torchvision" >/dev/null 2>&1; }
 install_pytorch() {
+    ensure_pip
     echo -e "${C_MINT}Installing PyTorch and Vision Libraries...${C_RESET}"
-    python3 -m pip install --user --upgrade torch torchvision torchaudio --break-system-packages || true
+    python3 -m pip install --user --upgrade torch torchvision torchaudio --break-system-packages
 }
 
 check_ml_suite() { python3 -c "import sklearn" >/dev/null 2>&1; }
 install_ml_suite() {
+    ensure_pip
     echo -e "${C_MINT}Installing ML Suite (Scikit-Learn, XGBoost, LightGBM)...${C_RESET}"
-    python3 -m pip install --user --upgrade scikit-learn xgboost lightgbm --break-system-packages || true
+    python3 -m pip install --user --upgrade scikit-learn xgboost lightgbm --break-system-packages
 }
 
 check_transformers() { python3 -c "import transformers" >/dev/null 2>&1; }
 install_transformers() {
+    ensure_pip
     echo -e "${C_MINT}Installing NLP & Transformers (Hugging Face, Datasets, Accelerate)...${C_RESET}"
-    python3 -m pip install --user --upgrade transformers datasets tokenizers accelerate --break-system-packages || true
+    python3 -m pip install --user --upgrade transformers datasets tokenizers accelerate --break-system-packages
 }
 
 check_vectordb() { python3 -c "import chromadb" >/dev/null 2>&1; }
 install_vectordb() {
+    ensure_pip
     echo -e "${C_MINT}Installing Vector DB & Embeddings (ChromaDB, Sentence-Transformers)...${C_RESET}"
-    python3 -m pip install --user --upgrade chromadb sentence-transformers --break-system-packages || true
+    python3 -m pip install --user --upgrade chromadb sentence-transformers --break-system-packages
 }
 
 check_jupyter() { command -v jupyter >/dev/null 2>&1 || python3 -c "import jupyterlab" >/dev/null 2>&1; }
 install_jupyter() {
+    ensure_pip
     echo -e "${C_MINT}Installing JupyterLab and Jupyter Notebook...${C_RESET}"
-    python3 -m pip install --user --upgrade jupyterlab notebook --break-system-packages || true
+    python3 -m pip install --user --upgrade jupyterlab notebook --break-system-packages
 }
 
 check_huggingface() { command -v huggingface-cli >/dev/null 2>&1 || python3 -c "import huggingface_hub" >/dev/null 2>&1; }
 install_huggingface() {
+    ensure_pip
     echo -e "${C_MINT}Installing Hugging Face Hub CLI...${C_RESET}"
-    python3 -m pip install --user --upgrade "huggingface_hub[cli]" --break-system-packages || true
+    python3 -m pip install --user --upgrade "huggingface_hub[cli]" --break-system-packages
 }
 
 # --- [05. DEVELOPMENT SOFTWARES & IDES] ---
@@ -857,6 +879,7 @@ cli_install() {
     eval "local tools=(\"\${${arr_name}[@]}\")"
     local uninstalled_names=()
     local uninstalled_installers=()
+    local uninstalled_checkers=()
 
     for item in "${tools[@]}"; do
         local name="${item%%|*}"
@@ -866,6 +889,7 @@ cli_install() {
         if ! $check_fn; then
             uninstalled_names+=("$name")
             uninstalled_installers+=("$install_fn")
+            uninstalled_checkers+=("$check_fn")
         fi
     done
 
@@ -884,30 +908,55 @@ cli_install() {
         exit 0
     fi
 
+    local target_indices=()
     if [ "$tools_input" = "all" ] || [ "$tools_input" = "ALL" ]; then
-        echo -e "${C_MINT}Installing all missing tools in category '$cat_input'...${C_RESET}"
         for i in "${!uninstalled_installers[@]}"; do
-            echo -e "\n${C_DARK_G}>>> [ $((i+1)) / ${#uninstalled_installers[@]} ] Installing: ${uninstalled_names[$i]}${C_RESET}"
-            ${uninstalled_installers[$i]}
+            target_indices+=("$i")
         done
     else
         IFS=',' read -ra SELECTED <<< "$tools_input"
         for sel in "${SELECTED[@]}"; do
             sel=$(echo "$sel" | xargs)
             if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#uninstalled_names[@]}" ]; then
-                local idx=$((sel - 1))
-                echo -e "\n${C_DARK_G}>>> Installing: ${uninstalled_names[$idx]}${C_RESET}"
-                ${uninstalled_installers[$idx]}
+                target_indices+=("$((sel - 1))")
             else
                 echo -e "${C_RED}Skipping invalid selection index: $sel${C_RESET}"
             fi
         done
     fi
 
+    local verified_count=0
+    local failed_count=0
+
+    for idx in "${target_indices[@]}"; do
+        local t_name="${uninstalled_names[$idx]}"
+        local t_installer="${uninstalled_installers[$idx]}"
+        local t_checker="${uninstalled_checkers[$idx]}"
+
+        echo -e "\n${C_DARK_G}>>> [ $((idx+1)) ] Provisioning: ${C_WHITE}${t_name}${C_RESET}"
+        $t_installer
+        sync_env
+
+        if $t_checker; then
+            echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Verified:${C_RESET} ${C_WHITE}${t_name}${C_RESET} is active and verified."
+            ((verified_count++))
+        else
+            echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Check Failed:${C_RESET} ${C_YELLOW}${t_name}${C_RESET} was not verified after setup."
+            ((failed_count++))
+        fi
+    done
+
     sync_env
     persist_env
     auto_stamp_desktop
-    echo -e "\n${C_LIGHT_G}${C_BOLD}[OK] Batch installation completed.${C_RESET}"
+
+    echo ""
+    echo -e "  ${C_GRAY}─────────────────────────────────────────────────────────────────${C_RESET}"
+    if [ "$failed_count" -eq 0 ] && [ "$verified_count" -gt 0 ]; then
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ SUCCESS ] All $verified_count selected tools verified successfully!${C_RESET}\n"
+    elif [ "$failed_count" -gt 0 ]; then
+        echo -e "  ${C_YELLOW}${C_BOLD}[ ATTENTION ] Completed with issues: $verified_count verified, $failed_count failed verification.${C_RESET}\n"
+    fi
 }
 
 cli_install_binary() {
@@ -918,18 +967,18 @@ cli_install_binary() {
         mkdir -p "$bin_target" "$CURRENT_HOME/.local/share/applications" "$CURRENT_HOME/Desktop"
     fi
     ln -sf "$REAL_SCRIPT_PATH" "$bin_target/ghost-stack"
-    ln -sf "$REAL_SCRIPT_PATH" "$bin_target/dev-wizard"
-    chmod +x "$bin_target/ghost-stack" "$bin_target/dev-wizard" 2>/dev/null || true
+    chmod +x "$bin_target/ghost-stack" 2>/dev/null || true
+    rm -f "$bin_target/dev-wizard" 2>/dev/null || true
     
-    if [ "$IS_TERMUX" = false ] && [ -f "$ROOT_DIR/Dev-Setup-Wizard.desktop" ]; then
-        cp "$ROOT_DIR/Dev-Setup-Wizard.desktop" "$CURRENT_HOME/Desktop/Dev-Setup-Wizard.desktop" 2>/dev/null || true
-        cp "$ROOT_DIR/Dev-Setup-Wizard.desktop" "$CURRENT_HOME/.local/share/applications/dev-setup-wizard.desktop" 2>/dev/null || true
+    if [ "$IS_TERMUX" = false ] && [ -f "$ROOT_DIR/Ghost-Stack.desktop" ]; then
+        cp "$ROOT_DIR/Ghost-Stack.desktop" "$CURRENT_HOME/Desktop/Ghost-Stack.desktop" 2>/dev/null || true
+        cp "$ROOT_DIR/Ghost-Stack.desktop" "$CURRENT_HOME/.local/share/applications/ghost-stack.desktop" 2>/dev/null || true
+        rm -f "$CURRENT_HOME/Desktop/Dev-Setup-Wizard.desktop" "$CURRENT_HOME/.local/share/applications/dev-setup-wizard.desktop" 2>/dev/null || true
         auto_stamp_desktop
     fi
     
     persist_env
     echo -e "${C_LIGHT_G}${C_BOLD}[OK] 'ghost-stack' has been installed to $bin_target/ghost-stack${C_RESET}"
-    echo -e "${C_LIGHT_G}${C_BOLD}[OK] Global alias symlink 'dev-wizard' registered${C_RESET}"
     echo -e "You can now run ${C_WHITE}${C_BOLD}ghost-stack${C_RESET} directly from any terminal directory!"
 }
 
@@ -998,7 +1047,7 @@ render_help_getting_started() {
         "${C_MINT}[ * ]${C_RESET} Fully accessible from any terminal directory across your system"
         ""
         "${C_LIGHT_G}Desktop Double-Click Launch (GUI):${C_RESET}"
-        "Double-click ${C_WHITE}Dev-Setup-Wizard.desktop${C_RESET} on Desktop, or execute ${C_WHITE}./launch.sh${C_RESET}."
+        "Double-click ${C_WHITE}Ghost-Stack.desktop${C_RESET} on Desktop, or execute ${C_WHITE}./launch.sh${C_RESET}."
         ""
         "${C_LIGHT_G}Termux on Android Support:${C_RESET}"
         "Run directly in Termux using ${C_WHITE}pkg install git bash make${C_RESET} and ${C_WHITE}./run.sh${C_RESET}."
@@ -1187,6 +1236,7 @@ handle_tui_category() {
         local installed_count=0
         local uninstalled_names=()
         local uninstalled_installers=()
+        local uninstalled_checkers=()
 
         for idx in "${!tool_list[@]}"; do
             local item="${tool_list[$idx]}"
@@ -1202,6 +1252,7 @@ handle_tui_category() {
                 badge_missing "$name"
                 uninstalled_names+=("$name")
                 uninstalled_installers+=("$install_fn")
+                uninstalled_checkers+=("$check_fn")
             fi
         done
 
@@ -1252,37 +1303,63 @@ handle_tui_category() {
 
         if [[ "$user_selection" =~ ^[Aa]$ ]]; then
             echo -e "\n${C_LIGHT_G}==> Provisioning all ${#uninstalled_names[@]} missing tools...${C_RESET}\n"
+            local success_count=0
+            local fail_count=0
             for u_idx in "${!uninstalled_names[@]}"; do
-                echo -e "\n${C_DARK_G}>>> [ $((u_idx+1)) / ${#uninstalled_names[@]} ] Installing: ${uninstalled_names[$u_idx]}${C_RESET}"
+                echo -e "\n${C_DARK_G}>>> [ $((u_idx+1)) / ${#uninstalled_names[@]} ] Installing: ${C_WHITE}${uninstalled_names[$u_idx]}${C_RESET}"
                 ${uninstalled_installers[$u_idx]}
+                sync_env
+                if ${uninstalled_checkers[$u_idx]}; then
+                    echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Verified:${C_RESET} ${C_WHITE}${uninstalled_names[$u_idx]}${C_RESET} is active and verified."
+                    ((success_count++))
+                else
+                    echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Verification error:${C_RESET} ${C_YELLOW}${uninstalled_names[$u_idx]}${C_RESET} failed check after installation."
+                    ((fail_count++))
+                fi
             done
             sync_env
             persist_env
             auto_stamp_desktop
-            echo -e "\n${C_LIGHT_G}${C_BOLD}[ OK ] Batch provisioning completed successfully.${C_RESET}"
+            if [ "$fail_count" -eq 0 ]; then
+                echo -e "\n${C_LIGHT_G}${C_BOLD}[ OK ] Batch provisioning completed. All $success_count tools verified successfully.${C_RESET}"
+            else
+                echo -e "\n${C_YELLOW}${C_BOLD}[ ATTENTION ] Batch provisioning completed with issues: $success_count verified, $fail_count failed.${C_RESET}"
+            fi
             pause
             continue
         fi
 
         IFS=',' read -ra SELECTED_ITEMS <<< "$user_selection"
-        local count=0
+        local success_count=0
+        local fail_count=0
         for sel in "${SELECTED_ITEMS[@]}"; do
             sel=$(echo "$sel" | xargs)
             if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#uninstalled_names[@]}" ]; then
                 local t_idx=$((sel - 1))
-                echo -e "\n${C_DARK_G}>>> Installing: ${uninstalled_names[$t_idx]}${C_RESET}"
+                echo -e "\n${C_DARK_G}>>> Installing: ${C_WHITE}${uninstalled_names[$t_idx]}${C_RESET}"
                 ${uninstalled_installers[$t_idx]}
-                ((count++))
+                sync_env
+                if ${uninstalled_checkers[$t_idx]}; then
+                    echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Verified:${C_RESET} ${C_WHITE}${uninstalled_names[$t_idx]}${C_RESET} is active and verified."
+                    ((success_count++))
+                else
+                    echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Verification error:${C_RESET} ${C_YELLOW}${uninstalled_names[$t_idx]}${C_RESET} failed check after installation."
+                    ((fail_count++))
+                fi
             else
                 echo -e "${C_RED}Skipping invalid selection index: $sel${C_RESET}"
             fi
         done
 
-        if [ "$count" -gt 0 ]; then
+        if [ $((success_count + fail_count)) -gt 0 ]; then
             sync_env
             persist_env
             auto_stamp_desktop
-            echo -e "\n${C_LIGHT_G}${C_BOLD}[ OK ] Provisioning complete.${C_RESET}"
+            if [ "$fail_count" -eq 0 ]; then
+                echo -e "\n${C_LIGHT_G}${C_BOLD}[ OK ] Provisioning complete. All $success_count tools verified successfully.${C_RESET}"
+            else
+                echo -e "\n${C_YELLOW}${C_BOLD}[ ATTENTION ] Completed with issues: $success_count verified, $fail_count failed.${C_RESET}"
+            fi
             pause
         fi
     done

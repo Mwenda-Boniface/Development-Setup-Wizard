@@ -19,7 +19,7 @@ all: help
 
 help:
 	@echo "Ghost-Stack Build & Installation Targets:"
-	@echo "  make install     - Install 'ghost-stack' & 'dev-wizard' into $(BINDIR)"
+	@echo "  make install     - Install 'ghost-stack' into $(BINDIR)"
 	@echo "  make uninstall   - Remove 'ghost-stack' from $(BINDIR)"
 	@echo "  make run         - Run interactive TUI directly"
 	@echo "  make scan        - Run headless full system scan"
@@ -30,10 +30,9 @@ install:
 	@mkdir -p $(BINDIR)
 	@chmod +x bin/ghost-stack launch.sh run.sh
 	@ln -sf $(CURDIR)/bin/ghost-stack $(BINDIR)/ghost-stack
-	@ln -sf $(CURDIR)/bin/ghost-stack $(BINDIR)/dev-wizard
 	@if [ ! -d "/data/data/com.termux" ]; then \
 		mkdir -p $(DESKTOPDIR); \
-		cp Dev-Setup-Wizard.desktop $(DESKTOPDIR)/dev-setup-wizard.desktop 2>/dev/null || true; \
+		cp Ghost-Stack.desktop $(DESKTOPDIR)/ghost-stack.desktop 2>/dev/null || true; \
 		which update-desktop-database >/dev/null 2>&1 && update-desktop-database $(DESKTOPDIR) || true; \
 	fi
 	@echo "[OK] 'ghost-stack' successfully installed to $(BINDIR)/ghost-stack"
@@ -41,7 +40,7 @@ install:
 
 uninstall:
 	@rm -f $(BINDIR)/ghost-stack $(BINDIR)/dev-wizard
-	@rm -f $(DESKTOPDIR)/dev-setup-wizard.desktop
+	@rm -f $(DESKTOPDIR)/ghost-stack.desktop $(DESKTOPDIR)/dev-setup-wizard.desktop
 	@echo "[OK] 'ghost-stack' uninstalled."
 
 run:
