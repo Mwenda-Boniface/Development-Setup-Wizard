@@ -141,122 +141,319 @@ EOF
 }
 
 # ==============================================================================
-# CLEANING MODULES
+# UNIFIED PURGE & AUTO-CLEAR ENGINE
 # ==============================================================================
-clean_tmp() {
-    echo -e "\n  ${C_CYAN}${C_BOLD}[ STAGE 1/5 ]${C_RESET} ${C_WHITE}Purging system temporary files (/tmp)...${C_RESET}"
-    local tmp_dir="/tmp"
-    if [ "$IS_TERMUX" = true ]; then
-        tmp_dir="${TMPDIR:-${PREFIX:-}/tmp}"
-    fi
+IS_IN_ROUTINE=false
+CLEANUP_STAGE_RESULTS=()
 
-    if [ -d "$tmp_dir" ]; then
-        find "$tmp_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + 2>/dev/null || true
-        badge_clean "Temporary directory storage ($tmp_dir) purged successfully."
-    else
-        badge_info "No temporary directory found at $tmp_dir."
-    fi
-}
-
-clean_user_cache() {
-    echo -e "\n  ${C_CYAN}${C_BOLD}[ STAGE 2/5 ]${C_RESET} ${C_WHITE}Purging user application cache directories...${C_RESET}"
-    local cache_target="$CURRENT_HOME/.cache"
-    
-    if [ -d "$cache_target" ]; then
-        local before_size
-        before_size=$(du -sh "$cache_target" 2>/dev/null | awk '{print $1}')
-        find "$cache_target" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + 2>/dev/null || true
-        badge_clean "Application cache (~/.cache) purged. Freed approx $before_size."
-    else
-        badge_info "User cache directory (~/.cache) is clean or does not exist."
-    fi
-}
-
-clear_trash() {
-    echo -e "\n  ${C_CYAN}${C_BOLD}[ STAGE 3/5 ]${C_RESET} ${C_WHITE}Emptying user and root desktop trash cans...${C_RESET}"
-    local user_trash="$CURRENT_HOME/.local/share/Trash"
-    local cleaned_any=false
-
-    if [ -d "$user_trash" ]; then
-        rm -rf "$user_trash/files/"* "$user_trash/info/"* 2>/dev/null || true
-        badge_clean "User Trash ($user_trash) emptied."
-        cleaned_any=true
-    fi
-
-    if [ -d "/root/.local/share/Trash" ]; then
-        rm -rf /root/.local/share/Trash/files/* /root/.local/share/Trash/info/* 2>/dev/null || true
-        badge_clean "Root administrative Trash emptied."
-        cleaned_any=true
-    fi
-
-    if [ "$cleaned_any" = false ]; then
-        badge_info "No pending trash files found in user or root namespaces."
-    fi
-}
-
-clean_apt() {
-    echo -e "\n  ${C_CYAN}${C_BOLD}[ STAGE 4/5 ]${C_RESET} ${C_WHITE}Analyzing APT package manager caches & orphaned archives...${C_RESET}"
-    
-    if [ "$IS_TERMUX" = true ]; then
-        if command -v apt-get >/dev/null 2>&1; then
-            apt-get clean 2>/dev/null || true
-            badge_clean "Termux package repository cache purged."
-        fi
-        return 0
-    fi
-
-    if command -v apt-get >/dev/null 2>&1; then
-        apt-get clean
-        badge_clean "APT package archive cache (/var/cache/apt/archives) purged."
-
-        echo ""
-        echo -ne "  ${C_MINT}[ ? ] Scan and remove orphaned/unused packages (apt autoremove)? [y/N]: ${C_RESET}"
-        read -r answer
-        if [[ "$answer" =~ ^[Yy]$ ]]; then
-            echo -e "  ${C_GRAY}Removing orphaned dependency trees...${C_RESET}"
-            apt-get autoremove -y >/dev/null 2>&1 || apt-get autoremove -y
-            badge_clean "Orphaned packages and unused dependencies pruned."
-        else
-            badge_info "Skipped apt autoremove upon request."
-        fi
-    else
-        badge_info "APT package manager not present on this host platform."
-    fi
-}
-
-clean_journal() {
-    echo -e "\n  ${C_CYAN}${C_BOLD}[ STAGE 5/5 ]${C_RESET} ${C_WHITE}Inspecting Systemd Journal logs disk footprint...${C_RESET}"
-
-    if command -v journalctl >/dev/null 2>&1; then
-        local current_usage
-        current_usage=$(journalctl --disk-usage 2>/dev/null || echo "N/A")
-        badge_info "Active Journal Footprint: ${C_WHITE}${current_usage}${C_RESET}"
-
-        echo ""
-        echo -ne "  ${C_MINT}[ ? ] Vacuum and cap archived system journal logs to 200 MB? [y/N]: ${C_RESET}"
-        read -r answer
-        if [[ "$answer" =~ ^[Yy]$ ]]; then
-            echo -e "  ${C_GRAY}Vacuuming systemd journal logs to 200M...${C_RESET}"
-            journalctl --vacuum-size=200M
-            badge_clean "Journal logs vacuumed to 200 MB quota."
-        else
-            badge_info "Journal vacuum skipped upon request."
-        fi
-    else
-        badge_info "Systemd journalctl daemon not present on this environment."
-    fi
-}
-
-run_full_cleanup_routine() {
+redraw_routine_view() {
     draw_cleaner_banner
     draw_box_header "SAFE SYSTEM CLEANUP ROUTINE"
     echo -e "  ${C_DARK_G}│${C_RESET}  This routine safely purges temporary session files, user app caches,  ${C_DARK_G}│${C_RESET}"
     echo -e "  ${C_DARK_G}│${C_RESET}  trash cans, APT package download caches, and caps bloated journal logs.${C_DARK_G}│${C_RESET}"
     draw_box_footer
     echo ""
+    for r in "${CLEANUP_STAGE_RESULTS[@]}"; do
+        echo -e "$r"
+    done
+}
+
+purge_targets() {
+    local target_description="$1"
+    local stage_label="$2"
+    shift 2
+    local targets=("$@")
+
+    local log_file
+    log_file=$(mktemp /tmp/ghost_clean_XXXXXX.log 2>/dev/null || echo "/tmp/ghost_clean_$$.log")
+    : > "$log_file"
+
+    local total_cleaned=0
+    echo -e "\n  ${C_CYAN}${C_BOLD}[ ${stage_label} ]${C_RESET} ${C_WHITE}Scanning ${target_description}...${C_RESET}"
+
+    local any_targets=false
+    for t in "${targets[@]}"; do
+        if [ -e "$t" ] || [ -d "$t" ]; then
+            any_targets=true
+            break
+        fi
+    done
+
+    if [ "$any_targets" = false ]; then
+        local msg="${target_description} is clean (0 pending items)."
+        if [ "$IS_IN_ROUTINE" = true ]; then
+            CLEANUP_STAGE_RESULTS+=("  ${C_CYAN}${C_BOLD}[ INFO ]${C_RESET}     ${msg}")
+            redraw_routine_view
+        else
+            badge_info "$msg"
+        fi
+        rm -f "$log_file" 2>/dev/null || true
+        return 0
+    fi
+
+    echo -e "  ${C_MINT}${C_BOLD}[ PURGING ]${C_RESET} ${C_WHITE}Streaming active deletion logs:${C_RESET}\n"
+
+    for t in "${targets[@]}"; do
+        [ ! -e "$t" ] && [ ! -d "$t" ] && continue
+
+        # Safety filter for /tmp
+        if [ "$t" = "/tmp" ] || [ "$t" = "${TMPDIR:-/data/data/com.termux/files/usr/tmp}" ]; then
+            while IFS= read -r subnode; do
+                [ -z "$subnode" ] && continue
+                case "$subnode" in
+                    */.X11-unix|*/.ICE-unix|*/.Test-unix|*/.font-unix|*/.XIM-unix)
+                        continue
+                        ;;
+                esac
+                while IFS= read -r line; do
+                    [ -z "$line" ] && continue
+                    local clean_path="${line#removed \'}"
+                    clean_path="${clean_path%\'}"
+                    clean_path="${clean_path#removed directory \'}"
+                    clean_path="${clean_path%\'}"
+                    printf "  ${C_DARK_G}▸${C_RESET} ${C_GRAY}cleaned:${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$clean_path"
+                    echo "$clean_path" >> "$log_file"
+                    ((total_cleaned++)) || true
+                done < <(rm -rfv "$subnode" 2>/dev/null)
+            done < <(find "$t" -mindepth 1 -maxdepth 1 2>/dev/null)
+            continue
+        fi
+
+        # Normal directory traversal
+        if [ -d "$t" ]; then
+            while IFS= read -r subnode; do
+                [ -z "$subnode" ] && continue
+                while IFS= read -r line; do
+                    [ -z "$line" ] && continue
+                    local clean_path="${line#removed \'}"
+                    clean_path="${clean_path%\'}"
+                    clean_path="${clean_path#removed directory \'}"
+                    clean_path="${clean_path%\'}"
+                    printf "  ${C_DARK_G}▸${C_RESET} ${C_GRAY}cleaned:${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$clean_path"
+                    echo "$clean_path" >> "$log_file"
+                    ((total_cleaned++)) || true
+                done < <(rm -rfv "$subnode" 2>/dev/null)
+            done < <(find "$t" -mindepth 1 -maxdepth 1 2>/dev/null)
+        else
+            while IFS= read -r line; do
+                [ -z "$line" ] && continue
+                local clean_path="${line#removed \'}"
+                clean_path="${clean_path%\'}"
+                clean_path="${clean_path#removed directory \'}"
+                clean_path="${clean_path%\'}"
+                printf "  ${C_DARK_G}▸${C_RESET} ${C_GRAY}cleaned:${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$clean_path"
+                echo "$clean_path" >> "$log_file"
+                ((total_cleaned++)) || true
+            done < <(rm -rfv "$t" 2>/dev/null)
+        fi
+    done
+
+    if [ "$total_cleaned" -eq 0 ]; then
+        local msg="${target_description} has 0 items requiring cleanup."
+        if [ "$IS_IN_ROUTINE" = true ]; then
+            CLEANUP_STAGE_RESULTS+=("  ${C_CYAN}${C_BOLD}[ INFO ]${C_RESET}     ${msg}")
+            redraw_routine_view
+        else
+            badge_info "$msg"
+        fi
+        rm -f "$log_file" 2>/dev/null || true
+        return 0
+    fi
+
+    echo ""
+    echo -e "  ${C_LIGHT_G}${C_BOLD}[ COMPLETED ]${C_RESET} ${C_WHITE}${total_cleaned} item(s) purged.${C_RESET} ${C_GRAY}Autoclearing deletion activity logs...${C_RESET}"
+    sleep 1
+
+    # Autoclear temporary disk log
+    rm -f "$log_file" 2>/dev/null || true
+
+    local result_badge="  ${C_MINT}${C_BOLD}[ CLEANED ]${C_RESET}  ${target_description} (${total_cleaned} items purged). Logs autocleared."
+
+    if [ "$IS_IN_ROUTINE" = true ]; then
+        CLEANUP_STAGE_RESULTS+=("$result_badge")
+        redraw_routine_view
+    else
+        draw_cleaner_banner
+        echo -e "$result_badge"
+    fi
+}
+
+# ==============================================================================
+# CLEANING MODULES
+# ==============================================================================
+clean_tmp() {
+    local tmp_dir="/tmp"
+    if [ "$IS_TERMUX" = true ]; then
+        tmp_dir="${TMPDIR:-${PREFIX:-}/tmp}"
+    fi
+    purge_targets "Temporary directory storage ($tmp_dir)" "STAGE 1/5" "$tmp_dir"
+}
+
+clean_user_cache() {
+    local cache_target="$CURRENT_HOME/.cache"
+    purge_targets "Application cache (~/.cache)" "STAGE 2/5" "$cache_target"
+}
+
+clear_trash() {
+    local user_trash="$CURRENT_HOME/.local/share/Trash"
+    local root_trash="/root/.local/share/Trash"
+    local trash_targets=()
+    [ -d "$user_trash/files" ] && trash_targets+=("$user_trash/files")
+    [ -d "$user_trash/info" ] && trash_targets+=("$user_trash/info")
+    if [ -d "$root_trash/files" ]; then
+        trash_targets+=("$root_trash/files" "$root_trash/info")
+    fi
+    purge_targets "Desktop & root trash cans" "STAGE 3/5" "${trash_targets[@]}"
+    mkdir -p "$user_trash/files" "$user_trash/info" 2>/dev/null || true
+}
+
+clean_apt() {
+    local stage_label="STAGE 4/5"
+    echo -e "\n  ${C_CYAN}${C_BOLD}[ ${stage_label} ]${C_RESET} ${C_WHITE}Inspecting APT package manager download archives & caches...${C_RESET}"
+
+    if [ "$IS_TERMUX" = true ]; then
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get clean 2>/dev/null || true
+            local msg="Termux package repository cache purged."
+            if [ "$IS_IN_ROUTINE" = true ]; then
+                CLEANUP_STAGE_RESULTS+=("  ${C_MINT}${C_BOLD}[ CLEANED ]${C_RESET}  $msg")
+                redraw_routine_view
+            else
+                badge_clean "$msg"
+            fi
+        fi
+        return 0
+    fi
+
+    if ! command -v apt-get >/dev/null 2>&1; then
+        local msg="APT package manager not present on this host platform."
+        if [ "$IS_IN_ROUTINE" = true ]; then
+            CLEANUP_STAGE_RESULTS+=("  ${C_CYAN}${C_BOLD}[ INFO ]${C_RESET}     $msg")
+            redraw_routine_view
+        else
+            badge_info "$msg"
+        fi
+        return 0
+    fi
+
+    local deb_count=0
+    local apt_archives="/var/cache/apt/archives"
+    if [ -d "$apt_archives" ]; then
+        deb_count=$(find "$apt_archives" -type f -name "*.deb" 2>/dev/null | wc -l)
+    fi
+
+    if [ "$deb_count" -gt 0 ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ PURGING ]${C_RESET} ${C_WHITE}Found $deb_count cached package archives (.deb). Streaming deletion logs:${C_RESET}\n"
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            local clean_path="${line#removed \'}"
+            clean_path="${clean_path%\'}"
+            printf "  ${C_DARK_G}▸${C_RESET} ${C_GRAY}cleaned:${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$clean_path"
+        done < <(find "$apt_archives" -type f -name "*.deb" -exec rm -rfv {} + 2>/dev/null)
+    fi
+    apt-get clean 2>/dev/null || true
+
+    local autoremove_done=false
+    if apt-get autoremove --dry-run 2>/dev/null | grep -q "0 upgraded, 0 newly installed, [1-9]"; then
+        echo ""
+        echo -ne "  ${C_MINT}[ ? ] Scan and remove orphaned/unused packages (apt autoremove)? [y/N]: ${C_RESET}"
+        local answer
+        read -r answer
+        if [[ "$answer" =~ ^[Yy]$ ]]; then
+            echo -e "  ${C_MINT}${C_BOLD}[ PURGING ]${C_RESET} ${C_WHITE}Pruning orphaned packages and dependencies:${C_RESET}\n"
+            while IFS= read -r line; do
+                if [[ "$line" =~ ^(Removing|Purging) ]]; then
+                    printf "  ${C_DARK_G}▸${C_RESET} ${C_GRAY}cleaned:${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$line"
+                fi
+            done < <(apt-get autoremove -y 2>&1)
+            autoremove_done=true
+        fi
+    fi
+
+    echo ""
+    echo -e "  ${C_LIGHT_G}${C_BOLD}[ COMPLETED ]${C_RESET} ${C_WHITE}APT cache optimization finished.${C_RESET} ${C_GRAY}Autoclearing deletion activity logs...${C_RESET}"
+    sleep 1
+
+    local apt_msg="APT package archives & dependency trees pruned."
+    if [ "$deb_count" -gt 0 ]; then
+        apt_msg="APT package cache ($deb_count .deb archives) purged."
+    fi
+
+    if [ "$IS_IN_ROUTINE" = true ]; then
+        CLEANUP_STAGE_RESULTS+=("  ${C_MINT}${C_BOLD}[ CLEANED ]${C_RESET}  $apt_msg Logs autocleared.")
+        redraw_routine_view
+    else
+        draw_cleaner_banner
+        badge_clean "$apt_msg Logs autocleared."
+    fi
+}
+
+clean_journal() {
+    local stage_label="STAGE 5/5"
+    echo -e "\n  ${C_CYAN}${C_BOLD}[ ${stage_label} ]${C_RESET} ${C_WHITE}Inspecting system journals & rotated system log files (/var/log)...${C_RESET}"
+
+    local rotated_logs=()
+    if [ -d "/var/log" ]; then
+        while IFS= read -r rlog; do
+            [ -n "$rlog" ] && rotated_logs+=("$rlog")
+        done < <(find /var/log -type f \( -name "*.gz" -o -name "*.1" -o -name "*.old" -o -name "*.[0-9]*.gz" \) 2>/dev/null)
+    fi
+
+    local log_count=${#rotated_logs[@]}
+    if [ "$log_count" -gt 0 ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ PURGING ]${C_RESET} ${C_WHITE}Found $log_count rotated archived log files. Streaming deletion logs:${C_RESET}\n"
+        for rlog in "${rotated_logs[@]}"; do
+            rm -rfv "$rlog" 2>/dev/null | while IFS= read -r line; do
+                [ -z "$line" ] && continue
+                local clean_path="${line#removed \'}"
+                clean_path="${clean_path%\'}"
+                printf "  ${C_DARK_G}▸${C_RESET} ${C_GRAY}cleaned:${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$clean_path"
+            done
+        done
+    fi
+
+    local vacuum_done=false
+    if command -v journalctl >/dev/null 2>&1; then
+        local current_usage
+        current_usage=$(journalctl --disk-usage 2>/dev/null || echo "N/A")
+        badge_info "Active Journal Footprint: ${C_WHITE}${current_usage}${C_RESET}"
+
+        echo ""
+        echo -ne "  ${C_MINT}[ ? ] Vacuum and cap system journal logs to 200 MB? [y/N]: ${C_RESET}"
+        local answer
+        read -r answer
+        if [[ "$answer" =~ ^[Yy]$ ]]; then
+            echo -e "  ${C_MINT}${C_BOLD}[ PURGING ]${C_RESET} ${C_WHITE}Vacuuming systemd journal logs to 200M quota:${C_RESET}\n"
+            journalctl --vacuum-size=200M 2>&1 | while IFS= read -r jline; do
+                [ -z "$jline" ] && continue
+                printf "  ${C_DARK_G}▸${C_RESET} ${C_GRAY}vacuumed:${C_RESET} ${C_WHITE}%s${C_RESET}\n" "$jline"
+            done
+            vacuum_done=true
+        fi
+    fi
+
+    echo ""
+    echo -e "  ${C_LIGHT_G}${C_BOLD}[ COMPLETED ]${C_RESET} ${C_WHITE}System logs and journal optimization complete.${C_RESET} ${C_GRAY}Autoclearing deletion activity logs...${C_RESET}"
+    sleep 1
+
+    local j_msg="System journals & archived logs vacuumed ($log_count rotated logs purged)."
+    if [ "$IS_IN_ROUTINE" = true ]; then
+        CLEANUP_STAGE_RESULTS+=("  ${C_MINT}${C_BOLD}[ CLEANED ]${C_RESET}  $j_msg Logs autocleared.")
+        redraw_routine_view
+    else
+        draw_cleaner_banner
+        badge_clean "$j_msg Logs autocleared."
+    fi
+}
+
+run_full_cleanup_routine() {
+    IS_IN_ROUTINE=true
+    CLEANUP_STAGE_RESULTS=()
 
     local storage_before storage_after
     storage_before=$(df -h / 2>/dev/null | awk 'NR==2 {print $4}')
+
+    redraw_routine_view
 
     clean_tmp
     clean_user_cache
@@ -266,11 +463,15 @@ run_full_cleanup_routine() {
 
     storage_after=$(df -h / 2>/dev/null | awk 'NR==2 {print $4}')
 
+    IS_IN_ROUTINE=false
+    redraw_routine_view
+
     echo ""
     draw_box_header "CLEANUP VERIFICATION & RESULTS"
     printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_YELLOW}%-44s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Free Storage (Before)" "$storage_before"
     printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_LIGHT_G}%-44s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Free Storage (After)" "$storage_after"
     printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_MINT}%-44s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "System Status" "OPTIMIZED & VERIFIED"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_WHITE}%-44s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Activity Logs" "AUTOCLEARED"
     draw_box_footer
 }
 
@@ -438,13 +639,14 @@ large_files() {
 # ==============================================================================
 cleanup_menu() {
     while true; do
+        IS_IN_ROUTINE=false
         draw_cleaner_banner
         draw_box_header "MODULAR CLEANUP SUITE"
         echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Purge Temporary Files (/tmp)${C_RESET}"
         echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}Purge User Application Caches (~/.cache)${C_RESET}"
         echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Empty User & Root Desktop Trash Cans${C_RESET}"
         echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}Clean APT Package Cache & Orphaned Deps${C_RESET}"
-        echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Vacuum Systemd System Journals (200MB limit)${C_RESET}"
+        echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Vacuum System Journals & Rotated Logs${C_RESET}"
         echo -e "  ${C_WHITE}[ 6 ]${C_RESET} ${C_MINT}${C_BOLD}Execute Complete Safe Cleanup Routine${C_RESET}"
         echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_GRAY}Return to Cleaner Main Menu${C_RESET}"
         draw_box_footer
