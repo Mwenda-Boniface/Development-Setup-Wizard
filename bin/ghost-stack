@@ -167,16 +167,138 @@ draw_divider() {
 # ==============================================================================
 # ENVIRONMENT & DESKTOP AUTO-STAMPING
 # ==============================================================================
+# ==============================================================================
+# ENVIRONMENT & TOOL DETECTION ENGINE
+# ==============================================================================
+add_to_path_if_dir_exists() {
+    local dir="$1"
+    [ -z "$dir" ] && return 1
+    [ ! -d "$dir" ] && return 1
+    case ":$PATH:" in
+        *":$dir:"*) ;;
+        *) export PATH="$dir:$PATH" ;;
+    esac
+}
+
+detect_all_installed_tools() {
+    # 1. Android SDK Root resolution
+    if [ ! -d "$ANDROID_DIR/cmdline-tools" ]; then
+        for cand in "$CURRENT_HOME/Android/Sdk" "$CURRENT_HOME/Android/sdk" /opt/android-sdk /usr/lib/android-sdk "$CURRENT_HOME"/.android/sdk; do
+            if [ -d "$cand" ]; then
+                ANDROID_DIR="$cand"
+                export ANDROID_HOME="$ANDROID_DIR"
+                break
+            fi
+        done
+    fi
+
+    # 2. Add all existing Android SDK tools subdirectories to PATH
+    if [ -d "$ANDROID_DIR" ]; then
+        add_to_path_if_dir_exists "$ANDROID_DIR/cmdline-tools/latest/bin"
+        add_to_path_if_dir_exists "$ANDROID_DIR/cmdline-tools/bin"
+        add_to_path_if_dir_exists "$ANDROID_DIR/platform-tools"
+        add_to_path_if_dir_exists "$ANDROID_DIR/emulator"
+        add_to_path_if_dir_exists "$ANDROID_DIR/tools/bin"
+        add_to_path_if_dir_exists "$ANDROID_DIR/tools"
+    fi
+
+    # 3. Android NDK resolution
+    for d in "$ANDROID_DIR"/ndk/* "$ANDROID_DIR/ndk-bundle" /opt/android-sdk/ndk/* /usr/lib/android-sdk/ndk/* "$CURRENT_HOME"/Android/ndk/*; do
+        if [ -d "$d" ] && [ -x "$d/ndk-build" ]; then
+            export ANDROID_NDK_HOME="$d"
+            export NDK_HOME="$d"
+            add_to_path_if_dir_exists "$d"
+            break
+        fi
+    done
+
+    # 4. Java 21 detection across filesystem
+    if [ ! -x "${JAVA_21_PATH:-}/bin/java" ]; then
+        for cand in /usr/lib/jvm/*21* /opt/*21* /usr/local/*21* "$CURRENT_HOME"/.jdks/*21* "$CURRENT_HOME"/.sdkman/candidates/java/*21*; do
+            if [ -x "$cand/bin/java" ]; then
+                JAVA_21_PATH="$cand"
+                break
+            fi
+        done
+    fi
+
+    # 5. Java 17 detection across filesystem
+    if [ ! -x "${JAVA_17_PATH:-}/bin/java" ]; then
+        for cand in /usr/lib/jvm/*17* /usr/lib/jvm/*temurin-17* /usr/lib/jvm/*openjdk-17* /opt/*17* /opt/*jdk*17* /usr/local/*17* /usr/local/*jdk*17* "$CURRENT_HOME"/.jdks/*17* "$CURRENT_HOME"/.sdkman/candidates/java/*17* "$CURRENT_HOME"/android-studio/jbr /opt/android-studio/jbr /snap/android-studio/current/jbr; do
+            if [ -x "$cand/bin/java" ]; then
+                if "$cand/bin/java" -version 2>&1 | grep -q "17\."; then
+                    JAVA_17_PATH="$cand"
+                    break
+                elif [ -z "$JAVA_17_PATH" ] && [[ "$cand" =~ 17 ]]; then
+                    JAVA_17_PATH="$cand"
+                fi
+            fi
+        done
+    fi
+
+    # Java Preferred resolution
+    if [ -d "${JAVA_21_PATH:-}" ]; then
+        JAVA_PREFERRED_PATH="$JAVA_21_PATH"
+    elif [ -d "${JAVA_17_PATH:-}" ]; then
+        JAVA_PREFERRED_PATH="$JAVA_17_PATH"
+    elif [ -d "/usr/lib/jvm/default-java" ]; then
+        JAVA_PREFERRED_PATH="/usr/lib/jvm/default-java"
+    fi
+    if [ -d "$JAVA_PREFERRED_PATH" ]; then
+        export JAVA_HOME="$JAVA_PREFERRED_PATH"
+        add_to_path_if_dir_exists "$JAVA_HOME/bin"
+    fi
+
+    # 6. Flutter SDK detection
+    if [ ! -x "$FLUTTER_DIR/bin/flutter" ]; then
+        for cand in "$CURRENT_HOME/development/flutter" "$CURRENT_HOME/flutter" /opt/flutter /usr/local/flutter "$CURRENT_HOME"/.flutter; do
+            if [ -x "$cand/bin/flutter" ]; then
+                FLUTTER_DIR="$cand"
+                break
+            fi
+        done
+    fi
+    [ -d "$FLUTTER_DIR/bin" ] && add_to_path_if_dir_exists "$FLUTTER_DIR/bin"
+
+    # 7. Gradle detection
+    if ! command -v gradle >/dev/null 2>&1; then
+        for cand in /opt/gradle/latest/bin /opt/gradle/gradle-*/bin /usr/local/gradle/bin "$CURRENT_HOME"/.gradle/wrapper/dists/*/*/gradle-*/bin; do
+            if [ -x "$cand/gradle" ]; then
+                add_to_path_if_dir_exists "$cand"
+                break
+            fi
+        done
+    fi
+
+    # 8. Common developer ecosystems
+    add_to_path_if_dir_exists "$CURRENT_HOME/.local/bin"
+    add_to_path_if_dir_exists "$CURRENT_HOME/.cargo/bin"
+    add_to_path_if_dir_exists "$CURRENT_HOME/go/bin"
+    add_to_path_if_dir_exists "/usr/local/go/bin"
+    add_to_path_if_dir_exists "$CURRENT_HOME/.bun/bin"
+    add_to_path_if_dir_exists "$CURRENT_HOME/.deno/bin"
+    add_to_path_if_dir_exists "/snap/bin"
+    add_to_path_if_dir_exists "/usr/local/bin"
+
+    # 9. Scrcpy detection
+    for cand in /usr/bin/scrcpy /usr/local/bin/scrcpy "$CURRENT_HOME"/.local/bin/scrcpy /opt/scrcpy/bin/scrcpy /snap/bin/scrcpy; do
+        if [ -x "$cand" ]; then
+            add_to_path_if_dir_exists "$(dirname "$cand")"
+            break
+        fi
+    done
+}
+
 sync_env() {
+    detect_all_installed_tools
     if [ -d "$JAVA_PREFERRED_PATH" ]; then
         export JAVA_HOME="$JAVA_PREFERRED_PATH"
     fi
     export ANDROID_HOME="$ANDROID_DIR"
+    [ -n "${ANDROID_NDK_HOME:-}" ] && export NDK_HOME="$ANDROID_NDK_HOME"
     local termux_prefix_bin="${PREFIX:-/data/data/com.termux/files/usr}/bin"
     if [ "$IS_TERMUX" = true ]; then
-        export PATH="$CURRENT_HOME/.local/bin:$termux_prefix_bin:$CURRENT_HOME/.cargo/bin:$CURRENT_HOME/go/bin:$CURRENT_HOME/.bun/bin:$CURRENT_HOME/.deno/bin:$FLUTTER_DIR/bin:$ANDROID_DIR/cmdline-tools/latest/bin:$ANDROID_DIR/platform-tools:${JAVA_HOME:-/usr}/bin:$PATH"
-    else
-        export PATH="$CURRENT_HOME/.local/bin:$CURRENT_HOME/.cargo/bin:$CURRENT_HOME/go/bin:$CURRENT_HOME/.bun/bin:$CURRENT_HOME/.deno/bin:$FLUTTER_DIR/bin:$ANDROID_DIR/cmdline-tools/latest/bin:$ANDROID_DIR/platform-tools:${JAVA_HOME:-/usr}/bin:$PATH"
+        add_to_path_if_dir_exists "$termux_prefix_bin"
     fi
 }
 sync_env
@@ -184,16 +306,19 @@ sync_env
 persist_env() {
     local env_block="
 # --- GHOST-STACK ENVIRONMENT PATHS (USER: $CURRENT_USER) ---
-export JAVA_HOME=\"${JAVA_PREFERRED_PATH}\"
-export ANDROID_HOME=\"\$HOME/Android/Sdk\"
-export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$HOME/go/bin:\$HOME/.bun/bin:\$HOME/.deno/bin:\$HOME/development/flutter/bin:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$JAVA_HOME/bin:\$PATH\"
+export JAVA_HOME=\"${JAVA_PREFERRED_PATH:-$JAVA_21_PATH}\"
+export ANDROID_HOME=\"${ANDROID_DIR:-$HOME/Android/Sdk}\"
+${ANDROID_NDK_HOME:+export ANDROID_NDK_HOME=\"$ANDROID_NDK_HOME\"}
+${ANDROID_NDK_HOME:+export NDK_HOME=\"$ANDROID_NDK_HOME\"}
+export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$HOME/go/bin:/usr/local/go/bin:\$HOME/.bun/bin:\$HOME/.deno/bin:\$HOME/development/flutter/bin:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$JAVA_HOME/bin:\$PATH\"
 # ----------------------------------------------------------"
 
-    for rc in "$CURRENT_HOME/.zshrc" "$CURRENT_HOME/.bashrc"; do
+    for rc in "$CURRENT_HOME/.zshrc" "$CURRENT_HOME/.bashrc" "$CURRENT_HOME/.profile"; do
         if [ -f "$rc" ]; then
-            if ! grep -q "GHOST-STACK ENVIRONMENT PATHS" "$rc" && ! grep -q "ANDROID_HOME" "$rc"; then
-                echo "$env_block" >> "$rc"
+            if grep -q "GHOST-STACK ENVIRONMENT PATHS" "$rc"; then
+                sed -i '/# --- GHOST-STACK ENVIRONMENT PATHS/,/# ----------------------------------------------------------/d' "$rc" 2>/dev/null || true
             fi
+            echo "$env_block" >> "$rc"
         fi
     done
 }
@@ -588,6 +713,10 @@ pause() {
 
 # --- [01. ANDROID DEVELOPMENT] ---
 check_java21() {
+    detect_all_installed_tools
+    if [ -x "${JAVA_21_PATH:-}/bin/java" ]; then
+        return 0
+    fi
     if [ "$IS_TERMUX" = true ]; then
         command -v java >/dev/null 2>&1
     else
@@ -595,52 +724,192 @@ check_java21() {
     fi
 }
 install_java21() {
-    echo -e "${C_MINT}Installing OpenJDK...${C_RESET}"
+    echo -e "${C_MINT}Checking local system for Java 21 LTS...${C_RESET}"
+    detect_all_installed_tools
+    if check_java21; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found Java 21 LTS at: ${JAVA_21_PATH}${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+    echo -e "${C_MINT}Installing OpenJDK 21 LTS...${C_RESET}"
     if [ "$IS_TERMUX" = true ]; then
         pkg_install openjdk-17
     else
         pkg_install openjdk-21-jdk
     fi
+    detect_all_installed_tools
     sync_env
 }
 
 check_java17() {
-    [ -d "$JAVA_17_PATH" ] || (command -v java >/dev/null && java -version 2>&1 | grep -q "17\.")
+    detect_all_installed_tools
+    if [ -x "${JAVA_17_PATH:-}/bin/java" ]; then
+        return 0
+    fi
+    if command -v java >/dev/null 2>&1; then
+        java -version 2>&1 | grep -q "17\."
+    else
+        return 1
+    fi
 }
+
 install_java17() {
-    echo -e "${C_MINT}Installing OpenJDK 17 LTS (Gradle fallback)...${C_RESET}"
-    pkg_install openjdk-17-jdk
+    echo -e "${C_MINT}Checking local system for Java 17 LTS...${C_RESET}"
+    detect_all_installed_tools
+    if check_java17; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found Java 17 LTS at: ${JAVA_17_PATH:-active java in PATH}${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+
+    # Pre-download archive detection: check ~/Downloads, $TMP_DIR, /tmp
+    local cached_tar
+    cached_tar=$(find "$CURRENT_HOME/Downloads" "$TMP_DIR" /tmp -maxdepth 2 -type f \( -iname "*jdk*17*.tar.gz" -o -iname "*temurin*17*.tar.gz" -o -iname "*openjdk*17*.tar.gz" \) 2>/dev/null | head -n 1)
+
+    local target_jvm_dir="/usr/lib/jvm/temurin-17-jdk-amd64"
+    if [ "$EUID" -ne 0 ] && ! command -v sudo >/dev/null 2>&1; then
+        target_jvm_dir="$CURRENT_HOME/.local/share/jvm/temurin-17-jdk"
+    fi
+
+    if [ -n "$cached_tar" ] && [ -f "$cached_tar" ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found local Java 17 archive: $cached_tar${C_RESET}"
+        echo -e "  ${C_GRAY}Installing from cached local archive into $target_jvm_dir...${C_RESET}"
+        sudo mkdir -p "$target_jvm_dir" 2>/dev/null || mkdir -p "$target_jvm_dir"
+        sudo tar -xzf "$cached_tar" -C "$target_jvm_dir" --strip-components=1 2>/dev/null || tar -xzf "$cached_tar" -C "$target_jvm_dir" --strip-components=1
+        sudo ln -sfn "$target_jvm_dir" /usr/lib/jvm/java-17-openjdk-amd64 2>/dev/null || true
+        JAVA_17_PATH="$target_jvm_dir"
+        sync_env
+        return 0
+    fi
+
+    # Attempt native package installation if available in repository
+    if [ "$IS_TERMUX" = true ]; then
+        pkg_install openjdk-17
+        sync_env
+        return 0
+    elif apt-cache show openjdk-17-jdk >/dev/null 2>&1; then
+        echo -e "${C_GRAY}Installing openjdk-17-jdk from system repositories...${C_RESET}"
+        pkg_install openjdk-17-jdk
+        sync_env
+        if check_java17; then return 0; fi
+    fi
+
+    # Repository lacks openjdk-17-jdk (e.g. Kali rolling / Debian sid).
+    # Download official Eclipse Temurin (Adoptium) OpenJDK 17 LTS binary
+    echo -e "  ${C_GRAY}Package openjdk-17-jdk not in repo. Provisioning official Eclipse Temurin 17 LTS binary...${C_RESET}"
+    local arch="x64"
+    case "$(uname -m)" in
+        aarch64|arm64) arch="aarch64" ;;
+        x86_64|amd64) arch="x64" ;;
+        armv7l|armhf) arch="arm" ;;
+    esac
+
+    local temurin_url="https://api.adoptium.net/v3/binary/latest/17/ga/linux/${arch}/jdk/hotspot/normal/eclipse"
+    local dl_tar="$TMP_DIR/temurin-17-jdk.tar.gz"
+    echo -e "  ${C_CYAN}Downloading OpenJDK 17 LTS archive...${C_RESET}"
+    curl -fL -o "$dl_tar" "$temurin_url" || curl -fL -o "$dl_tar" "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.12+7/OpenJDK17U-jdk_${arch}_linux_hotspot_17.0.12_7.tar.gz"
+
+    if [ -f "$dl_tar" ] && [ -s "$dl_tar" ]; then
+        if sudo mkdir -p "$target_jvm_dir" 2>/dev/null; then
+            echo -e "  ${C_GRAY}Extracting into system directory $target_jvm_dir...${C_RESET}"
+            sudo tar -xzf "$dl_tar" -C "$target_jvm_dir" --strip-components=1
+            sudo ln -sfn "$target_jvm_dir" /usr/lib/jvm/java-17-openjdk-amd64 2>/dev/null || true
+            JAVA_17_PATH="$target_jvm_dir"
+        else
+            target_jvm_dir="$CURRENT_HOME/.local/share/jvm/temurin-17-jdk-amd64"
+            echo -e "  ${C_GRAY}Extracting into user JVM repository ($target_jvm_dir)...${C_RESET}"
+            mkdir -p "$target_jvm_dir"
+            tar -xzf "$dl_tar" -C "$target_jvm_dir" --strip-components=1
+            JAVA_17_PATH="$target_jvm_dir"
+        fi
+        rm -f "$dl_tar"
+    else
+        echo -e "  ${C_RED}Failed to download Eclipse Temurin 17 LTS binary.${C_RESET}"
+    fi
+
     sync_env
 }
 
-check_android_cmdline() { [ -x "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" ]; }
+check_android_cmdline() {
+    detect_all_installed_tools
+    [ -x "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" ] || [ -x "$ANDROID_DIR/cmdline-tools/bin/sdkmanager" ] || command -v sdkmanager >/dev/null 2>&1
+}
+
 install_android_cmdline() {
+    echo -e "${C_MINT}Checking local system for Android Command-Line Tools...${C_RESET}"
+    detect_all_installed_tools
+    if check_android_cmdline; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found sdkmanager on filesystem.${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+
     check_java21 || check_java17 || install_java21
-    echo -e "${C_MINT}Downloading Android Command-Line Tools (sdkmanager)...${C_RESET}"
+
+    local cached_cmdline
+    cached_cmdline=$(find "$CURRENT_HOME/Downloads" "$TMP_DIR" /tmp -maxdepth 2 -type f \( -iname "*commandlinetools*.zip" -o -iname "*cmdline-tools*.zip" \) 2>/dev/null | head -n 1)
+
     mkdir -p "$ANDROID_DIR/cmdline-tools" "$TMP_DIR"
     local zip_file="$TMP_DIR/cmdline-tools.zip"
-    curl -L -o "$zip_file" "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+
+    if [ -n "$cached_cmdline" ] && [ -f "$cached_cmdline" ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found local commandlinetools archive: $cached_cmdline${C_RESET}"
+        cp "$cached_cmdline" "$zip_file"
+    else
+        echo -e "${C_MINT}Downloading Android Command-Line Tools (sdkmanager)...${C_RESET}"
+        curl -L -o "$zip_file" "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+    fi
+
     unzip -q -o "$zip_file" -d "$TMP_DIR/cmdline-extract"
     mkdir -p "$ANDROID_DIR/cmdline-tools/latest"
     cp -r "$TMP_DIR"/cmdline-extract/cmdline-tools/* "$ANDROID_DIR/cmdline-tools/latest/"
     chmod +x "$ANDROID_DIR/cmdline-tools/latest/bin/"* 2>/dev/null || true
     rm -rf "$TMP_DIR/cmdline-extract" "$zip_file"
+    detect_all_installed_tools
     sync_env
 }
 
-check_android_platform_tools() { [ -x "$ANDROID_DIR/platform-tools/adb" ] || command -v adb >/dev/null 2>&1; }
+check_android_platform_tools() {
+    detect_all_installed_tools
+    [ -x "$ANDROID_DIR/platform-tools/adb" ] || command -v adb >/dev/null 2>&1
+}
+
 install_android_platform_tools() {
+    echo -e "${C_MINT}Checking local system for Android Platform-Tools...${C_RESET}"
+    detect_all_installed_tools
+    if check_android_platform_tools; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found adb and platform-tools on filesystem.${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+
     echo -e "${C_MINT}Installing Android Platform-Tools (adb, fastboot)...${C_RESET}"
     if [ "$IS_TERMUX" = true ]; then
         pkg_install android-tools
     else
-        check_android_cmdline || install_android_cmdline
-        sync_env
-        echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
+        local cached_pt
+        cached_pt=$(find "$CURRENT_HOME/Downloads" "$TMP_DIR" /tmp -maxdepth 2 -type f -iname "*platform-tools*.zip" 2>/dev/null | head -n 1)
+        if [ -n "$cached_pt" ] && [ -f "$cached_pt" ]; then
+            echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found local platform-tools archive: $cached_pt${C_RESET}"
+            unzip -q -o "$cached_pt" -d "$ANDROID_DIR/"
+        else
+            check_android_cmdline || install_android_cmdline
+            sync_env
+            echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
+        fi
     fi
+    detect_all_installed_tools
+    sync_env
 }
 
-check_android_platforms() { [ -d "$ANDROID_DIR/platforms/android-36" ] || [ -d "$ANDROID_DIR/platforms/android-34" ]; }
+check_android_platforms() {
+    [ -d "$ANDROID_DIR/platforms/android-36" ] || [ -d "$ANDROID_DIR/platforms/android-34" ] || [ -d "$ANDROID_DIR/platforms/android-35" ]
+}
+
 install_android_platforms() {
     echo -e "${C_MINT}Installing Android SDK Platforms (API 34 & 36)...${C_RESET}"
     check_android_cmdline || install_android_cmdline
@@ -648,7 +917,10 @@ install_android_platforms() {
     echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "platforms;android-34"
 }
 
-check_android_build_tools() { [ -d "$ANDROID_DIR/build-tools/28.0.3" ] || [ -d "$ANDROID_DIR/build-tools/34.0.0" ]; }
+check_android_build_tools() {
+    [ -d "$ANDROID_DIR/build-tools/28.0.3" ] || [ -d "$ANDROID_DIR/build-tools/34.0.0" ] || [ -d "$ANDROID_DIR/build-tools/35.0.0" ]
+}
+
 install_android_build_tools() {
     echo -e "${C_MINT}Installing Android Build-Tools (28.0.3 & 34.0.0)...${C_RESET}"
     check_android_cmdline || install_android_cmdline
@@ -656,22 +928,107 @@ install_android_build_tools() {
     echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "build-tools;28.0.3" "build-tools;34.0.0"
 }
 
-check_android_ndk() { [ -d "$ANDROID_DIR/ndk" ] && [ "$(ls -A "$ANDROID_DIR/ndk" 2>/dev/null)" ]; }
+check_android_ndk() {
+    detect_all_installed_tools
+    [ -n "${ANDROID_NDK_HOME:-}" ] && [ -x "$ANDROID_NDK_HOME/ndk-build" ] && return 0
+    [ -d "$ANDROID_DIR/ndk" ] && [ "$(ls -A "$ANDROID_DIR/ndk" 2>/dev/null)" ] && return 0
+    [ -d "$ANDROID_DIR/ndk-bundle" ] && return 0
+    command -v ndk-build >/dev/null 2>&1
+}
+
 install_android_ndk() {
+    echo -e "${C_MINT}Checking local system for Android NDK...${C_RESET}"
+    detect_all_installed_tools
+    if check_android_ndk; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found Android NDK at: ${ANDROID_NDK_HOME:-$ANDROID_DIR/ndk}${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+
+    local cached_zip
+    cached_zip=$(find "$CURRENT_HOME/Downloads" "$TMP_DIR" /tmp -maxdepth 2 -type f \( -iname "*android-ndk*.zip" -o -iname "*ndk*.zip" \) 2>/dev/null | head -n 1)
+
+    if [ -n "$cached_zip" ] && [ -f "$cached_zip" ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found local Android NDK archive: $cached_zip${C_RESET}"
+        echo -e "  ${C_GRAY}Extracting into $ANDROID_DIR/ndk...${C_RESET}"
+        mkdir -p "$ANDROID_DIR/ndk"
+        unzip -q -o "$cached_zip" -d "$ANDROID_DIR/ndk/"
+        detect_all_installed_tools
+        sync_env
+        return 0
+    fi
+
     echo -e "${C_MINT}Installing Android NDK (Native Development Kit)...${C_RESET}"
     check_android_cmdline || install_android_cmdline
     sync_env
-    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "ndk;26.2.11394342" || echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "ndk-bundle"
+    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "ndk;26.2.11394342" || \
+    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "ndk;25.2.9519653" || \
+    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "ndk-bundle"
+    detect_all_installed_tools
+    sync_env
 }
 
-check_gradle() { command -v gradle >/dev/null 2>&1; }
+check_gradle() {
+    detect_all_installed_tools
+    command -v gradle >/dev/null 2>&1
+}
+
 install_gradle() {
+    echo -e "${C_MINT}Checking local system for Gradle...${C_RESET}"
+    detect_all_installed_tools
+    if check_gradle; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found Gradle on filesystem.${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+
+    local cached_gradle
+    cached_gradle=$(find "$CURRENT_HOME/Downloads" "$TMP_DIR" /tmp -maxdepth 2 -type f -iname "*gradle*-bin.zip" 2>/dev/null | head -n 1)
+
+    if [ -n "$cached_gradle" ] && [ -f "$cached_gradle" ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found local Gradle archive: $cached_gradle${C_RESET}"
+        sudo mkdir -p /opt/gradle
+        sudo unzip -q -o "$cached_gradle" -d /opt/gradle/
+        detect_all_installed_tools
+        sync_env
+        return 0
+    fi
+
     echo -e "${C_MINT}Installing Gradle Build Tool...${C_RESET}"
     pkg_install gradle
+    detect_all_installed_tools
+    sync_env
 }
 
-check_flutter() { [ -x "$FLUTTER_DIR/bin/flutter" ] || command -v flutter >/dev/null 2>&1; }
+check_flutter() {
+    detect_all_installed_tools
+    [ -x "$FLUTTER_DIR/bin/flutter" ] || command -v flutter >/dev/null 2>&1
+}
+
 install_flutter() {
+    echo -e "${C_MINT}Checking local system for Flutter SDK...${C_RESET}"
+    detect_all_installed_tools
+    if check_flutter; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found Flutter SDK at: $FLUTTER_DIR${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+
+    local cached_flutter
+    cached_flutter=$(find "$CURRENT_HOME/Downloads" "$TMP_DIR" /tmp -maxdepth 2 -type f \( -iname "*flutter*linux*.tar.xz" -o -iname "*flutter*.zip" \) 2>/dev/null | head -n 1)
+
+    if [ -n "$cached_flutter" ] && [ -f "$cached_flutter" ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found local Flutter archive: $cached_flutter${C_RESET}"
+        mkdir -p "$DEV_DIR"
+        tar -xf "$cached_flutter" -C "$DEV_DIR/" 2>/dev/null || unzip -q -o "$cached_flutter" -d "$DEV_DIR/"
+        detect_all_installed_tools
+        sync_env
+        return 0
+    fi
+
     echo -e "${C_MINT}Cloning Flutter SDK (stable channel)...${C_RESET}"
     mkdir -p "$DEV_DIR"
     if [ ! -d "$FLUTTER_DIR" ]; then
@@ -680,15 +1037,41 @@ install_flutter() {
         cd "$FLUTTER_DIR" && git pull || true
     fi
     sync_env
-    "$FLUTTER_DIR/bin/flutter" precache
+    "$FLUTTER_DIR/bin/flutter" precache || true
     "$FLUTTER_DIR/bin/flutter" config --android-sdk "$ANDROID_DIR" || true
     yes | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
 }
 
-check_scrcpy() { command -v scrcpy >/dev/null 2>&1; }
+check_scrcpy() {
+    detect_all_installed_tools
+    command -v scrcpy >/dev/null 2>&1
+}
+
 install_scrcpy() {
+    echo -e "${C_MINT}Checking local system for Scrcpy...${C_RESET}"
+    detect_all_installed_tools
+    if check_scrcpy; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found Scrcpy binary on filesystem.${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ PATH ADDED ]${C_RESET} ${C_WHITE}Added to environment PATH without re-downloading.${C_RESET}"
+        sync_env
+        return 0
+    fi
+
+    local cached_deb
+    cached_deb=$(find "$CURRENT_HOME/Downloads" "$TMP_DIR" /tmp -maxdepth 2 -type f -iname "*scrcpy*.deb" 2>/dev/null | head -n 1)
+
+    if [ -n "$cached_deb" ] && [ -f "$cached_deb" ]; then
+        echo -e "  ${C_MINT}${C_BOLD}[ DETECTED ]${C_RESET} ${C_WHITE}Found local scrcpy package: $cached_deb${C_RESET}"
+        sudo dpkg -i "$cached_deb" || sudo apt-get install -f -y
+        detect_all_installed_tools
+        sync_env
+        return 0
+    fi
+
     echo -e "${C_MINT}Installing Scrcpy (Android Screen Mirroring over USB)...${C_RESET}"
     pkg_install scrcpy
+    detect_all_installed_tools
+    sync_env
 }
 
 # --- [02. IOS DEVELOPMENT (LINUX STACK)] ---
@@ -1757,6 +2140,8 @@ handle_tui_category() {
     local total_tools=${#tool_list[@]}
 
     while true; do
+        detect_all_installed_tools
+        sync_env
         draw_banner
         local t_cols
         t_cols=$(get_current_cols)
@@ -1846,8 +2231,15 @@ handle_tui_category() {
                     echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Verified:${C_RESET} ${C_WHITE}${uninstalled_names[$u_idx]}${C_RESET} is active and verified."
                     ((success_count++))
                 else
-                    echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Verification error:${C_RESET} ${C_YELLOW}${uninstalled_names[$u_idx]}${C_RESET} failed check after installation."
-                    ((fail_count++))
+                    detect_all_installed_tools
+                    sync_env
+                    if ${uninstalled_checkers[$u_idx]}; then
+                        echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Auto-Resolved & Verified:${C_RESET} ${C_WHITE}${uninstalled_names[$u_idx]}${C_RESET} detected on disk and added to PATH."
+                        ((success_count++))
+                    else
+                        echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Verification error:${C_RESET} ${C_YELLOW}${uninstalled_names[$u_idx]}${C_RESET} failed check after installation."
+                        ((fail_count++))
+                    fi
                 fi
             done
             sync_env
@@ -1876,8 +2268,15 @@ handle_tui_category() {
                     echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Verified:${C_RESET} ${C_WHITE}${uninstalled_names[$t_idx]}${C_RESET} is active and verified."
                     ((success_count++))
                 else
-                    echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Verification error:${C_RESET} ${C_YELLOW}${uninstalled_names[$t_idx]}${C_RESET} failed check after installation."
-                    ((fail_count++))
+                    detect_all_installed_tools
+                    sync_env
+                    if ${uninstalled_checkers[$t_idx]}; then
+                        echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Auto-Resolved & Verified:${C_RESET} ${C_WHITE}${uninstalled_names[$t_idx]}${C_RESET} detected on disk and added to PATH."
+                        ((success_count++))
+                    else
+                        echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Verification error:${C_RESET} ${C_YELLOW}${uninstalled_names[$t_idx]}${C_RESET} failed check after installation."
+                        ((fail_count++))
+                    fi
                 fi
             else
                 echo -e "${C_RED}Skipping invalid selection index: $sel${C_RESET}"
