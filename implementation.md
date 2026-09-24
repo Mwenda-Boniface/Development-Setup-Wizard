@@ -80,21 +80,24 @@ Ghost-Stack features full native support for Android Termux:
 
 ---
 
-## 3. Dedicated Home Screen Telemetry Layout
+## 3. Dedicated Home Screen Telemetry Layout (Dual-Column Architecture)
 
-On the primary home screen (`tui_main`), Ghost-Stack renders an elegant, spacious diagnostic telemetry frame before presenting the discipline options:
+On the primary home screen (`tui_main`), Ghost-Stack renders an elegant, spacious 2-column diagnostic telemetry frame displaying host telemetry, CPU speed, and real-time memory and storage metrics before presenting the discipline options:
 ```text
-  ┌─[ SYSTEM ENVIRONMENT TELEMETRY ]──────────────────────────────────────┐
-  │
-  │   [*] Architecture     :  x86_64
-  │   [*] Operating System :  Kali GNU/Linux Rolling
-  │   [*] Active Session   :  bonnie
-  │   [*] Runtime Platform :  Native Linux (APT)
-  │   [*] Workspace Path   :  /home/bonnie/Desktop/setup-wizard
-  │
-  └──────────────────────────────────────────────────────────────────────────────┘
+  ┌─[ SYSTEM ENVIRONMENT TELEMETRY ]───────────────────────────────────────────────────────────────────────┐
+  │                                                                                                        │
+  │   [*] Architecture    : x86_64                      [*] CPU Speed       : 2.50 GHz                     │
+  │   [*] Operating System: Kali GNU/Linux Rolling      [*] Active Session  : bonnie                       │
+  │   [*] Memory (RAM)    : 4.5Gi / 7.6Gi (3.1Gi Free)  [*] Disk Storage    : 57G / 226G (158G Free)       │
+  │   [*] Runtime Platform: Native Linux (APT)          [*] Workspace Path  : ~/Desktop/setup-wizard       │
+  │                                                                                                        │
+  └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
-**Submenu Isolation:** When the user enters any submenu, discipline category, or help manual, this telemetry box is automatically hidden to keep navigation focused. It reappears only when returning to the main menu.
+**Key Telemetry Capabilities:**
+- **CPU Speed:** Dynamically detects real-time clock frequency via `/sys/devices/system/cpu/cpufreq`, `/proc/cpuinfo`, or `lscpu`.
+- **Memory (RAM):** Reports active memory usage, total system capacity, and free/available memory via `free -h` or `/proc/meminfo`.
+- **Disk Storage:** Reports current workspace partition storage usage, total disk size, and available free space via `df -h`.
+- **Submenu Isolation:** When the user enters any submenu, discipline category, or help manual, this telemetry box is automatically hidden to keep navigation focused. It reappears only when returning to the main menu.
 The terminal prompt is dynamically scoped:
 - Main Menu: `ghost-stack > `
 - Discipline Submenu: `ghost-stack(android) > `, `ghost-stack(web) > `

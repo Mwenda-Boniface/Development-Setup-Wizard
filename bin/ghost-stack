@@ -173,6 +173,83 @@ EOF
     echo -e "       ${C_WHITE}${C_BOLD}[ + ]   C O D E   B Y   M W E N D A   B O N I F A C E   [ + ]${C_RESET}\n"
 }
 
+get_cpu_speed() {
+    local speed=""
+    if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ]; then
+        local khz
+        khz=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
+        if [ -n "$khz" ] && [ "$khz" -gt 0 ] 2>/dev/null; then
+            speed=$(awk -v k="$khz" 'BEGIN {printf "%.2f GHz", k/1000000}')
+        fi
+    fi
+    if [ -z "$speed" ] && [ -f /proc/cpuinfo ]; then
+        local mhz
+        mhz=$(awk -F: '/cpu MHz/{print $2; exit}' /proc/cpuinfo 2>/dev/null | xargs)
+        if [ -n "$mhz" ]; then
+            speed=$(awk -v m="$mhz" 'BEGIN {printf "%.2f GHz", m/1000}')
+        fi
+    fi
+    if [ -z "$speed" ] && command -v lscpu >/dev/null 2>&1; then
+        local max_mhz
+        max_mhz=$(lscpu 2>/dev/null | awk -F: '/CPU max MHz/{print $2}' | xargs)
+        if [ -n "$max_mhz" ]; then
+            speed=$(awk -v m="$max_mhz" 'BEGIN {printf "%.2f GHz", m/1000}')
+        fi
+    fi
+    if [ -z "$speed" ] && [ -f /proc/cpuinfo ]; then
+        speed=$(grep -m 1 "model name" /proc/cpuinfo 2>/dev/null | sed -n 's/.*@ *\([0-9.]*[A-Za-z]*Hz\).*/\1/p')
+    fi
+    [ -z "$speed" ] && speed="N/A"
+    echo "$speed"
+}
+
+get_mem_info() {
+    if command -v free >/dev/null 2>&1; then
+        free -h 2>/dev/null | awk '/^Mem:/ {print $3 " / " $2 " (" $7 " Free)"}'
+    elif [ -f /proc/meminfo ]; then
+        awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END {printf "%.1fG / %.1fG (%.1fG Free)\n", (t-a)/1024/1024, t/1024/1024, a/1024/1024}' /proc/meminfo 2>/dev/null
+    else
+        echo "N/A"
+    fi
+}
+
+get_disk_info() {
+    local dinfo
+    dinfo=$(df -h "$ROOT_DIR" 2>/dev/null | awk 'NR==2 {print $3 " / " $2 " (" $4 " Free)"}')
+    if [ -z "$dinfo" ]; then
+        dinfo=$(df -h / 2>/dev/null | awk 'NR==2 {print $3 " / " $2 " (" $4 " Free)"}')
+    fi
+    [ -z "$dinfo" ] && dinfo="N/A"
+    echo "$dinfo"
+}
+
+draw_telemetry_col() {
+    local label="$1"
+    local val="$2"
+    local width="$3"
+    local padded_label
+    printf -v padded_label "%-16s" "$label"
+    local max_val_len=$(( width - 22 ))
+    if [ "${#val}" -gt "$max_val_len" ]; then
+        val="...${val: -$((max_val_len - 3))}"
+    fi
+    local visible_len=$(( 4 + 16 + 2 + ${#val} ))
+    local pad=0
+    if [ "$visible_len" -lt "$width" ]; then
+        pad=$((width - visible_len))
+    fi
+    printf "${C_MINT}[*] %s:${C_RESET} ${C_WHITE}%s${C_RESET}%*s" "$padded_label" "$val" "$pad" ""
+}
+
+draw_telemetry_row() {
+    local l_lbl="$1" l_val="$2" r_lbl="$3" r_val="$4"
+    echo -en "  ${C_GRAY}│${C_RESET}   "
+    draw_telemetry_col "$l_lbl" "$l_val" 48
+    echo -en "  "
+    draw_telemetry_col "$r_lbl" "$r_val" 48
+    echo -e "   ${C_GRAY}│${C_RESET}"
+}
+
 draw_home_telemetry() {
     local platform_label
     if [ "$IS_TERMUX" = true ]; then
@@ -181,15 +258,20 @@ draw_home_telemetry() {
         platform_label="Native Linux (APT)"
     fi
 
-    echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]──────────────────────────────────────┐${C_RESET}"
-    echo -e "  ${C_GRAY}│${C_RESET}"
-    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Architecture     :${C_RESET}  ${C_WHITE}${ARCH}${C_RESET}"
-    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Operating System :${C_RESET}  ${C_WHITE}${OS_NAME}${C_RESET}"
-    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Active Session   :${C_RESET}  ${C_WHITE}${CURRENT_USER}${C_RESET}"
-    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Runtime Platform :${C_RESET}  ${C_LIGHT_G}${platform_label}${C_RESET}"
-    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Workspace Path   :${C_RESET}  ${C_WHITE}${ROOT_DIR}${C_RESET}"
-    echo -e "  ${C_GRAY}│${C_RESET}"
-    echo -e "  ${C_GRAY}└──────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
+    local cpu_speed mem_info disk_info display_workspace
+    cpu_speed=$(get_cpu_speed)
+    mem_info=$(get_mem_info)
+    disk_info=$(get_disk_info)
+    display_workspace=$(echo "$ROOT_DIR" | sed "s|^$HOME|~|")
+
+    echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]$(printf "%0.s─" {1..71})┐${C_RESET}"
+    echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
+    draw_telemetry_row "Architecture" "$ARCH" "CPU Speed" "$cpu_speed"
+    draw_telemetry_row "Operating System" "$OS_NAME" "Active Session" "$CURRENT_USER"
+    draw_telemetry_row "Memory (RAM)" "$mem_info" "Disk Storage" "$disk_info"
+    draw_telemetry_row "Runtime Platform" "$platform_label" "Workspace Path" "$display_workspace"
+    echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
+    echo -e "  ${C_GRAY}└$(printf "%0.s─" {1..104})┘${C_RESET}"
     echo ""
 }
 
