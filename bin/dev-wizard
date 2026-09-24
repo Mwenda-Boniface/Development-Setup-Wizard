@@ -1,0 +1,898 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# DEV-WIZARD CLI & TUI TOOLCHAIN ORCHESTRATOR
+# Version: 2.1.0
+# License: MIT
+# Platform: Linux (Debian, Ubuntu, Kali, Mint, Pop!_OS)
+# Style: Minimalist Terminal Emerald Green (Strictly Zero Emojis)
+# ==============================================================================
+
+set -o pipefail
+
+# Ensure bash execution
+if [ -z "$BASH_VERSION" ]; then
+    exec bash "$0" "$@"
+fi
+
+# Core Paths
+REAL_SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+ROOT_DIR="$(cd "$(dirname "$REAL_SCRIPT_PATH")/.." && pwd)"
+DEV_DIR="$HOME/development"
+FLUTTER_DIR="$DEV_DIR/flutter"
+ANDROID_DIR="$HOME/Android/Sdk"
+JAVA_PREFERRED_PATH="/usr/lib/jvm/java-21-openjdk-amd64"
+
+# ==============================================================================
+# COLOR PALETTE (EMERALD GREEN THEME)
+# ==============================================================================
+C_EMERALD="\033[38;5;48m"   # Bright glowing emerald
+C_MINT="\033[38;5;84m"      # Crisp readable mint green
+C_FOREST="\033[38;5;35m"    # Mid forest green
+C_DARK_G="\033[38;5;29m"    # Deep border green
+C_WHITE="\033[1;37m"        # High contrast white
+C_GRAY="\033[38;5;244m"     # Technical muted gray
+C_RED="\033[1;31m"          # Failure / missing
+C_YELLOW="\033[1;33m"       # Warning / attention
+C_BOLD="\033[1m"
+C_DIM="\033[2m"
+C_RESET="\033[0m"
+
+# Status Badges (Strictly Zero Emojis)
+badge_ok()      { echo -e "  ${C_EMERALD}${C_BOLD}[ OK ]${C_RESET}       $1"; }
+badge_missing() { echo -e "  ${C_RED}${C_BOLD}[ MISSING ]${C_RESET}  $1"; }
+badge_warn()    { echo -e "  ${C_YELLOW}${C_BOLD}[ WARN ]${C_RESET}     $1"; }
+badge_info()    { echo -e "  ${C_MINT}${C_BOLD}[ INFO ]${C_RESET}     $1"; }
+
+# ==============================================================================
+# ENVIRONMENT SYNCHRONIZATION
+# ==============================================================================
+sync_env() {
+    if [ -d "$JAVA_PREFERRED_PATH" ]; then
+        export JAVA_HOME="$JAVA_PREFERRED_PATH"
+    fi
+    export ANDROID_HOME="$ANDROID_DIR"
+    export PATH="$HOME/.local/bin:$FLUTTER_DIR/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:${JAVA_HOME:-/usr}/bin:$PATH"
+}
+sync_env
+
+persist_env() {
+    local env_block="
+# --- DEV-WIZARD ENVIRONMENT PATHS ---
+export JAVA_HOME=\"${JAVA_PREFERRED_PATH}\"
+export ANDROID_HOME=\"\$HOME/Android/Sdk\"
+export PATH=\"\$HOME/.local/bin:\$HOME/development/flutter/bin:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$JAVA_HOME/bin:\$PATH\"
+# ------------------------------------"
+
+    for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+        if [ -f "$rc" ]; then
+            if ! grep -q "DEV-WIZARD ENVIRONMENT PATHS" "$rc" && ! grep -q "ANDROID_HOME" "$rc"; then
+                echo "$env_block" >> "$rc"
+            fi
+        fi
+    done
+}
+persist_env
+
+# ==============================================================================
+# UI RENDERERS
+# ==============================================================================
+draw_banner() {
+    clear
+    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}DEV-WIZARD // SYSTEM & TOOLCHAIN ORCHESTRATOR${C_RESET}                ${C_DARK_G}v2.1.0${C_RESET}  ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_GRAY}Modular Environment Provisioning, State Diagnostics & Package Matrix${C_RESET}     ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+    echo ""
+}
+
+pause() {
+    echo ""
+    echo -e "${C_GRAY}Press [Enter] to continue...${C_RESET}"
+    read -r || true
+}
+
+# ==============================================================================
+# TOOL IMPLEMENTATIONS (CHECKS & INSTALLERS)
+# ==============================================================================
+
+# --- [ANDROID] ---
+check_java21() {
+    [ -d "$JAVA_PREFERRED_PATH" ] || (command -v java >/dev/null && java -version 2>&1 | grep -q "21\.")
+}
+install_java21() {
+    echo -e "${C_MINT}Installing OpenJDK 21 LTS via apt...${C_RESET}"
+    sudo apt update && sudo apt install -y openjdk-21-jdk
+    sync_env
+}
+
+check_android_cmdline() {
+    [ -x "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" ]
+}
+install_android_cmdline() {
+    echo -e "${C_MINT}Downloading Android Command-Line Tools (sdkmanager)...${C_RESET}"
+    mkdir -p "$ANDROID_DIR/cmdline-tools" /tmp
+    local zip_file="/tmp/cmdline-tools.zip"
+    curl -L -o "$zip_file" "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+    unzip -q -o "$zip_file" -d /tmp/cmdline-extract
+    mkdir -p "$ANDROID_DIR/cmdline-tools/latest"
+    cp -r /tmp/cmdline-extract/cmdline-tools/* "$ANDROID_DIR/cmdline-tools/latest/"
+    rm -rf /tmp/cmdline-extract "$zip_file"
+    sync_env
+}
+
+check_android_platform_tools() {
+    [ -x "$ANDROID_DIR/platform-tools/adb" ] || command -v adb >/dev/null 2>&1
+}
+install_android_platform_tools() {
+    echo -e "${C_MINT}Installing Android Platform-Tools (adb, fastboot)...${C_RESET}"
+    check_android_cmdline || install_android_cmdline
+    sync_env
+    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
+}
+
+check_android_platforms() {
+    [ -d "$ANDROID_DIR/platforms/android-36" ] || [ -d "$ANDROID_DIR/platforms/android-34" ]
+}
+install_android_platforms() {
+    echo -e "${C_MINT}Installing Android SDK Platforms (API 34 & 36)...${C_RESET}"
+    check_android_cmdline || install_android_cmdline
+    sync_env
+    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "platforms;android-34"
+}
+
+check_android_build_tools() {
+    [ -d "$ANDROID_DIR/build-tools/28.0.3" ] || [ -d "$ANDROID_DIR/build-tools/34.0.0" ]
+}
+install_android_build_tools() {
+    echo -e "${C_MINT}Installing Android Build-Tools (28.0.3 & 34.0.0)...${C_RESET}"
+    check_android_cmdline || install_android_cmdline
+    sync_env
+    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "build-tools;28.0.3" "build-tools;34.0.0"
+}
+
+check_flutter() {
+    [ -x "$FLUTTER_DIR/bin/flutter" ] || command -v flutter >/dev/null 2>&1
+}
+install_flutter() {
+    echo -e "${C_MINT}Cloning Flutter SDK (stable channel)...${C_RESET}"
+    mkdir -p "$DEV_DIR"
+    if [ ! -d "$FLUTTER_DIR" ]; then
+        git clone https://github.com/flutter/flutter.git -b stable "$FLUTTER_DIR"
+    else
+        cd "$FLUTTER_DIR" && git pull || true
+    fi
+    sync_env
+    "$FLUTTER_DIR/bin/flutter" precache
+    "$FLUTTER_DIR/bin/flutter" config --android-sdk "$ANDROID_DIR" || true
+    yes | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
+}
+
+# --- [IOS (LINUX TOOLS)] ---
+check_usbmuxd() { command -v usbmuxd >/dev/null 2>&1; }
+install_usbmuxd() {
+    echo -e "${C_MINT}Installing usbmuxd (USB daemon for iOS devices)...${C_RESET}"
+    sudo apt update && sudo apt install -y usbmuxd
+}
+
+check_libimobiledevice() {
+    command -v ideviceinfo >/dev/null 2>&1 || dpkg -s libimobiledevice6 >/dev/null 2>&1
+}
+install_libimobiledevice() {
+    echo -e "${C_MINT}Installing libimobiledevice communication stack...${C_RESET}"
+    sudo apt update && sudo apt install -y libimobiledevice6 libimobiledevice-utils
+}
+
+check_ideviceinstaller() { command -v ideviceinstaller >/dev/null 2>&1; }
+install_ideviceinstaller() {
+    echo -e "${C_MINT}Installing ideviceinstaller...${C_RESET}"
+    sudo apt update && sudo apt install -y ideviceinstaller
+}
+
+check_cocoapods() { command -v pod >/dev/null 2>&1; }
+install_cocoapods() {
+    echo -e "${C_MINT}Installing Ruby and CocoaPods...${C_RESET}"
+    sudo apt update && sudo apt install -y ruby-full build-essential
+    sudo gem install cocoapods || true
+}
+
+# --- [WEB DEVELOPMENT] ---
+check_nodejs() { command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; }
+install_nodejs() {
+    echo -e "${C_MINT}Installing Node.js LTS and npm...${C_RESET}"
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+    sudo apt install -y nodejs
+}
+
+check_pnpm_yarn() { command -v pnpm >/dev/null 2>&1 && command -v yarn >/dev/null 2>&1; }
+install_pnpm_yarn() {
+    echo -e "${C_MINT}Installing pnpm and yarn package managers...${C_RESET}"
+    sudo npm install -g pnpm yarn
+}
+
+check_postgresql() { command -v psql >/dev/null 2>&1; }
+install_postgresql() {
+    echo -e "${C_MINT}Installing PostgreSQL server and client tools...${C_RESET}"
+    sudo apt update && sudo apt install -y postgresql postgresql-contrib
+    sudo systemctl enable --now postgresql || true
+}
+
+check_redis() { command -v redis-server >/dev/null 2>&1 && command -v redis-cli >/dev/null 2>&1; }
+install_redis() {
+    echo -e "${C_MINT}Installing Redis server and CLI...${C_RESET}"
+    sudo apt update && sudo apt install -y redis-server redis-tools
+    sudo systemctl enable --now redis-server || true
+}
+
+check_docker() { command -v docker >/dev/null 2>&1; }
+install_docker() {
+    echo -e "${C_MINT}Installing Docker Engine & Docker Compose plugin...${C_RESET}"
+    sudo apt update && sudo apt install -y docker.io docker-compose-plugin docker-compose
+    sudo systemctl enable --now docker || true
+    sudo usermod -aG docker "$USER" || true
+    echo -e "${C_EMERALD}Docker installed. Group activation applies on new terminal session.${C_RESET}"
+}
+
+check_chrome() { command -v google-chrome >/dev/null 2>&1 || command -v chromium >/dev/null 2>&1; }
+install_chrome() {
+    echo -e "${C_MINT}Installing Chromium Browser...${C_RESET}"
+    sudo apt update && sudo apt install -y chromium
+}
+
+# --- [AI & MACHINE LEARNING] ---
+check_python_env() {
+    command -v python3 >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1
+}
+install_python_env() {
+    echo -e "${C_MINT}Installing Python 3, pip, and venv tooling...${C_RESET}"
+    sudo apt update && sudo apt install -y python3 python3-pip python3-venv python3-full
+}
+
+check_ollama() { command -v ollama >/dev/null 2>&1; }
+install_ollama() {
+    echo -e "${C_MINT}Installing Ollama (Local AI & LLM Runtime)...${C_RESET}"
+    curl -fsSL https://ollama.com/install.sh | sh
+}
+
+check_jupyter() {
+    command -v jupyter >/dev/null 2>&1 || python3 -c "import jupyterlab" >/dev/null 2>&1
+}
+install_jupyter() {
+    echo -e "${C_MINT}Installing JupyterLab and Jupyter Notebook...${C_RESET}"
+    python3 -m pip install --user --upgrade jupyterlab notebook --break-system-packages || true
+}
+
+check_ai_stack() {
+    python3 -c "import numpy, pandas, sklearn" >/dev/null 2>&1
+}
+install_ai_stack() {
+    echo -e "${C_MINT}Installing Core AI Stack (NumPy, Pandas, Scikit-Learn, PyTorch)...${C_RESET}"
+    python3 -m pip install --user --upgrade numpy pandas scikit-learn matplotlib scipy torch torchvision --break-system-packages || true
+}
+
+check_huggingface() {
+    command -v huggingface-cli >/dev/null 2>&1 || python3 -c "import huggingface_hub" >/dev/null 2>&1
+}
+install_huggingface() {
+    echo -e "${C_MINT}Installing Hugging Face Hub CLI...${C_RESET}"
+    python3 -m pip install --user --upgrade "huggingface_hub[cli]" --break-system-packages || true
+}
+
+# --- [DEVELOPMENT SOFTWARES] ---
+check_vscode() { command -v code >/dev/null 2>&1 || command -v code-oss >/dev/null 2>&1; }
+install_vscode() {
+    echo -e "${C_MINT}Installing Visual Studio Code...${C_RESET}"
+    local deb_path="/tmp/vscode.deb"
+    curl -L -o "$deb_path" "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"
+    sudo apt install -y "$deb_path" || sudo dpkg -i "$deb_path" || sudo apt install -f -y
+    rm -f "$deb_path"
+}
+
+check_gh_cli() { command -v gh >/dev/null 2>&1; }
+install_gh_cli() {
+    echo -e "${C_MINT}Installing GitHub CLI (gh)...${C_RESET}"
+    sudo mkdir -p -m 755 /etc/apt/keyrings
+    wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+    sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    sudo apt update && sudo apt install -y gh
+}
+
+check_postman() { command -v postman >/dev/null 2>&1 || [ -d "/opt/Postman" ]; }
+install_postman() {
+    echo -e "${C_MINT}Installing Postman API Client...${C_RESET}"
+    local tar_path="/tmp/postman.tar.gz"
+    curl -L -o "$tar_path" "https://dl.pstmn.io/download/latest/linux_64"
+    sudo tar -xzf "$tar_path" -C /opt
+    sudo ln -sf /opt/Postman/Postman /usr/local/bin/postman
+    rm -f "$tar_path"
+    
+    cat << EOF | sudo tee /usr/share/applications/postman.desktop > /dev/null
+[Desktop Entry]
+Name=Postman
+GenericName=API Client
+Comment=API Development Platform
+Exec=/opt/Postman/Postman
+Icon=/opt/Postman/app/resources/app/assets/icon.png
+Terminal=false
+Type=Application
+Categories=Development;
+EOF
+    echo -e "${C_EMERALD}Postman installed successfully.${C_RESET}"
+}
+
+check_dbeaver() { command -v dbeaver >/dev/null 2>&1 || dpkg -s dbeaver-ce >/dev/null 2>&1; }
+install_dbeaver() {
+    echo -e "${C_MINT}Installing DBeaver Universal Database Manager...${C_RESET}"
+    local deb_path="/tmp/dbeaver.deb"
+    curl -L -o "$deb_path" "https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb"
+    sudo apt install -y "$deb_path" || sudo dpkg -i "$deb_path" || sudo apt install -f -y
+    rm -f "$deb_path"
+}
+
+check_git_gui() { command -v git-cola >/dev/null 2>&1 || command -v gitk >/dev/null 2>&1; }
+install_git_gui() {
+    echo -e "${C_MINT}Installing Git GUI Tools (Git Cola, Gitk)...${C_RESET}"
+    sudo apt update && sudo apt install -y git-cola gitk
+}
+
+check_tmux_htop() { command -v tmux >/dev/null 2>&1 && command -v htop >/dev/null 2>&1; }
+install_tmux_htop() {
+    echo -e "${C_MINT}Installing Tmux and Htop...${C_RESET}"
+    sudo apt update && sudo apt install -y tmux htop
+}
+
+# --- [CORE SYSTEM & GIT] ---
+check_git_configured() {
+    command -v git >/dev/null 2>&1 && [ -n "$(git config --global user.name 2>/dev/null)" ]
+}
+install_git_configured() {
+    echo -e "${C_MINT}Configuring Git Global Identity...${C_RESET}"
+    read -rp "Enter Full Name: " g_name
+    read -rp "Enter GitHub Email: " g_email
+    [ -n "$g_name" ] && git config --global user.name "$g_name"
+    [ -n "$g_email" ] && git config --global user.email "$g_email"
+    git config --global init.defaultBranch main
+}
+
+check_github_ssh() { [ -f "$HOME/.ssh/id_ed25519" ]; }
+install_github_ssh() {
+    echo -e "${C_MINT}Generating Ed25519 SSH Key for GitHub...${C_RESET}"
+    local email
+    email=$(git config --global user.email 2>/dev/null || echo "developer@example.com")
+    mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+    ssh-keygen -t ed25519 -C "$email" -f "$HOME/.ssh/id_ed25519" -N ""
+    chmod 600 "$HOME/.ssh/id_ed25519"
+    chmod 644 "$HOME/.ssh/id_ed25519.pub"
+    echo -e "\n${C_EMERALD}Public Key (Copy to https://github.com/settings/keys):${C_RESET}"
+    cat "$HOME/.ssh/id_ed25519.pub"
+    echo ""
+    read -rp "Press [Enter] to test connection..."
+    ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -T git@github.com 2>&1 || true
+}
+
+check_build_essentials() {
+    command -v clang >/dev/null 2>&1 && command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1 && command -v pkg-config >/dev/null 2>&1
+}
+install_build_essentials() {
+    echo -e "${C_MINT}Installing C/C++ Build Essentials and system libraries...${C_RESET}"
+    sudo apt update && sudo apt install -y clang cmake ninja-build pkg-config build-essential libgtk-3-dev liblzma-dev mesa-utils curl git unzip zip xz-utils
+}
+
+# ==============================================================================
+# TOOL REGISTRY DEFINITION
+# ==============================================================================
+TOOLS_ANDROID=(
+    "Java 21 LTS (OpenJDK)|check_java21|install_java21"
+    "Android Command-Line Tools (sdkmanager)|check_android_cmdline|install_android_cmdline"
+    "Android Platform-Tools (adb, fastboot)|check_android_platform_tools|install_android_platform_tools"
+    "Android SDK Platform (API 34 & 36)|check_android_platforms|install_android_platforms"
+    "Android Build-Tools (28.0.3 & 34.0.0)|check_android_build_tools|install_android_build_tools"
+    "Flutter SDK (Stable Channel)|check_flutter|install_flutter"
+)
+
+TOOLS_IOS=(
+    "usbmuxd (USB daemon for iOS devices)|check_usbmuxd|install_usbmuxd"
+    "libimobiledevice (iOS communication library)|check_libimobiledevice|install_libimobiledevice"
+    "ideviceinstaller (App manager for iOS)|check_ideviceinstaller|install_ideviceinstaller"
+    "CocoaPods (iOS Dependency Manager)|check_cocoapods|install_cocoapods"
+)
+
+TOOLS_WEB=(
+    "Node.js (LTS) & npm Package Manager|check_nodejs|install_nodejs"
+    "pnpm & yarn Package Managers|check_pnpm_yarn|install_pnpm_yarn"
+    "PostgreSQL Database Client & Server|check_postgresql|install_postgresql"
+    "Redis Server & In-Memory Store|check_redis|install_redis"
+    "Docker Engine & Docker Compose|check_docker|install_docker"
+    "Google Chrome / Chromium Browser|check_chrome|install_chrome"
+)
+
+TOOLS_AI=(
+    "Python 3, pip, & venv Environment|check_python_env|install_python_env"
+    "Ollama (Local LLM Runtime - Llama, DeepSeek)|check_ollama|install_ollama"
+    "Core AI Stack (NumPy, Pandas, PyTorch)|check_ai_stack|install_ai_stack"
+    "JupyterLab & Notebook Web Interface|check_jupyter|install_jupyter"
+    "Hugging Face Hub CLI (huggingface-cli)|check_huggingface|install_huggingface"
+)
+
+TOOLS_SOFTWARE=(
+    "Visual Studio Code (VS Code)|check_vscode|install_vscode"
+    "GitHub CLI (gh)|check_gh_cli|install_gh_cli"
+    "Postman (API Testing Client)|check_postman|install_postman"
+    "DBeaver Community (Universal Database GUI)|check_dbeaver|install_dbeaver"
+    "Git GUI Tools (Git Cola / Gitk)|check_git_gui|install_git_gui"
+    "Tmux & Htop (Terminal Productivity)|check_tmux_htop|install_tmux_htop"
+)
+
+TOOLS_CORE=(
+    "Git CLI & Global Identity Setup|check_git_configured|install_git_configured"
+    "GitHub SSH Authentication Key (~/.ssh/id_ed25519)|check_github_ssh|install_github_ssh"
+    "C/C++ Build Essentials (clang, cmake, ninja)|check_build_essentials|install_build_essentials"
+)
+
+get_category_array_name() {
+    case "$1" in
+        android|1) echo "TOOLS_ANDROID" ;;
+        ios|2)     echo "TOOLS_IOS" ;;
+        web|3)     echo "TOOLS_WEB" ;;
+        ai|4)      echo "TOOLS_AI" ;;
+        software|tools|5) echo "TOOLS_SOFTWARE" ;;
+        core|git|6) echo "TOOLS_CORE" ;;
+        *) return 1 ;;
+    esac
+}
+
+get_category_title() {
+    case "$1" in
+        android|1) echo "ANDROID DEVELOPMENT" ;;
+        ios|2)     echo "IOS DEVELOPMENT (LINUX TOOLS)" ;;
+        web|3)     echo "WEB DEVELOPMENT" ;;
+        ai|4)      echo "AI & MACHINE LEARNING DEVELOPMENT" ;;
+        software|tools|5) echo "DEVELOPMENT SOFTWARES & TOOLS" ;;
+        core|git|6) echo "CORE SYSTEM TOOLS & GIT" ;;
+        *) echo "UNKNOWN CATEGORY" ;;
+    esac
+}
+
+# ==============================================================================
+# CLI EXECUTION MODES FOR TECH GURUS
+# ==============================================================================
+
+# CLI: Diagnostic scan
+cli_scan() {
+    local target_cat="$1"
+
+    if [ -n "$target_cat" ]; then
+        local arr_name
+        arr_name=$(get_category_array_name "$target_cat") || {
+            echo -e "${C_RED}Error: Unknown category '$target_cat'.${C_RESET}"
+            echo "Available categories: android, ios, web, ai, tools, core"
+            exit 1
+        }
+        local title
+        title=$(get_category_title "$target_cat")
+        echo -e "${C_DARK_G}┌─[ ${C_EMERALD}${C_BOLD}DIAGNOSTIC SCAN: $title${C_RESET}${C_DARK_G} ]${C_RESET}"
+        eval "local tools=(\"\${${arr_name}[@]}\")"
+        local missing=0
+        for item in "${tools[@]}"; do
+            local name="${item%%|*}"
+            local rest="${item#*|}"
+            local check_fn="${rest%%|*}"
+            if $check_fn; then
+                badge_ok "$name"
+            else
+                badge_missing "$name"
+                ((missing++))
+            fi
+        done
+        echo -e "${C_DARK_G}└─────────────────────────────────────────────────────────${C_RESET}"
+        [ "$missing" -eq 0 ] && exit 0 || exit 1
+    fi
+
+    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}COMPREHENSIVE TOOLCHAIN DIAGNOSTIC SCAN${C_RESET}                                   ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+    echo ""
+
+    local categories=("TOOLS_ANDROID" "TOOLS_IOS" "TOOLS_WEB" "TOOLS_AI" "TOOLS_SOFTWARE" "TOOLS_CORE")
+    local titles=("ANDROID DEVELOPMENT" "IOS DEVELOPMENT (LINUX TOOLS)" "WEB DEVELOPMENT" "AI & MACHINE LEARNING" "DEVELOPMENT SOFTWARES" "CORE SYSTEM TOOLS & GIT")
+
+    local total_checked=0
+    local total_passed=0
+
+    for idx in "${!categories[@]}"; do
+        echo -e "${C_DARK_G}┌─[ ${C_MINT}${C_BOLD}${titles[$idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
+        eval "local tools=(\"\${${categories[$idx]}[@]}\")"
+        for item in "${tools[@]}"; do
+            local name="${item%%|*}"
+            local rest="${item#*|}"
+            local check_fn="${rest%%|*}"
+            ((total_checked++))
+            if $check_fn; then
+                badge_ok "$name"
+                ((total_passed++))
+            else
+                badge_missing "$name"
+            fi
+        done
+        echo -e "${C_DARK_G}└─────────────────────────────────────────────────────────${C_RESET}\n"
+    done
+
+    echo -e "${C_WHITE}${C_BOLD}Scan Summary:${C_RESET} ${C_EMERALD}$total_passed${C_RESET} of ${C_WHITE}$total_checked${C_RESET} tools verified."
+    if [ "$total_passed" -eq "$total_checked" ]; then
+        echo -e "${C_EMERALD}${C_BOLD}Status: All required developer tools are installed!${C_RESET}"
+        exit 0
+    else
+        echo -e "${C_YELLOW}${C_BOLD}Status: Missing tools detected. Run 'dev-wizard' or 'dev-wizard install <cat> <items>' to install.${C_RESET}"
+        exit 1
+    fi
+}
+
+# CLI: Headless installation
+cli_install() {
+    local cat_input="$1"
+    local tools_input="$2"
+
+    if [ -z "$cat_input" ]; then
+        echo -e "${C_RED}Error: Category required. Example: dev-wizard install web 1,3 or dev-wizard install ai all${C_RESET}"
+        exit 1
+    fi
+
+    local arr_name
+    arr_name=$(get_category_array_name "$cat_input") || {
+        echo -e "${C_RED}Error: Unknown category '$cat_input'.${C_RESET}"
+        echo "Valid categories: android, ios, web, ai, tools, core"
+        exit 1
+    }
+
+    eval "local tools=(\"\${${arr_name}[@]}\")"
+    local uninstalled_names=()
+    local uninstalled_installers=()
+
+    for item in "${tools[@]}"; do
+        local name="${item%%|*}"
+        local rest="${item#*|}"
+        local check_fn="${rest%%|*}"
+        local install_fn="${rest#*|}"
+        if ! $check_fn; then
+            uninstalled_names+=("$name")
+            uninstalled_installers+=("$install_fn")
+        fi
+    done
+
+    if [ ${#uninstalled_names[@]} -eq 0 ]; then
+        echo -e "${C_EMERALD}[OK] All tools in category '$cat_input' are already installed.${C_RESET}"
+        exit 0
+    fi
+
+    if [ -z "$tools_input" ]; then
+        echo -e "${C_YELLOW}Missing tools in category '$cat_input':${C_RESET}"
+        for i in "${!uninstalled_names[@]}"; do
+            echo -e "  [$((i+1))] ${uninstalled_names[$i]}"
+        done
+        echo ""
+        echo "Run with selection, e.g.: dev-wizard install $cat_input 1,2 or dev-wizard install $cat_input all"
+        exit 0
+    fi
+
+    if [ "$tools_input" = "all" ] || [ "$tools_input" = "ALL" ]; then
+        echo -e "${C_MINT}Installing all missing tools in category '$cat_input'...${C_RESET}"
+        for i in "${!uninstalled_installers[@]}"; do
+            echo -e "\n${C_DARK_G}>>> [ $((i+1)) / ${#uninstalled_installers[@]} ] Installing: ${uninstalled_names[$i]}${C_RESET}"
+            ${uninstalled_installers[$i]}
+        done
+    else
+        IFS=',' read -ra SELECTED <<< "$tools_input"
+        for sel in "${SELECTED[@]}"; do
+            sel=$(echo "$sel" | xargs)
+            if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#uninstalled_names[@]}" ]; then
+                local idx=$((sel - 1))
+                echo -e "\n${C_DARK_G}>>> Installing: ${uninstalled_names[$idx]}${C_RESET}"
+                ${uninstalled_installers[$idx]}
+            else
+                echo -e "${C_RED}Skipping invalid selection index: $sel${C_RESET}"
+            fi
+        done
+    fi
+
+    sync_env
+    persist_env
+    echo -e "\n${C_EMERALD}${C_BOLD}[OK] Batch installation completed.${C_RESET}"
+}
+
+# CLI: Install CLI binary into ~/.local/bin
+cli_install_binary() {
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$REAL_SCRIPT_PATH" "$HOME/.local/bin/dev-wizard"
+    chmod +x "$HOME/.local/bin/dev-wizard"
+    persist_env
+    echo -e "${C_EMERALD}${C_BOLD}[OK] 'dev-wizard' has been installed to $HOME/.local/bin/dev-wizard${C_RESET}"
+    echo -e "You can now run ${C_WHITE}${C_BOLD}dev-wizard${C_RESET} directly from any terminal directory!"
+}
+
+# CLI: Doctor
+cli_doctor() {
+    sync_env
+    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}FLUTTER & ANDROID TOOLCHAIN DOCTOR${C_RESET}                                      ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+    echo ""
+    if command -v flutter >/dev/null 2>&1; then
+        flutter doctor -v
+    elif [ -x "$FLUTTER_DIR/bin/flutter" ]; then
+        "$FLUTTER_DIR/bin/flutter" doctor -v
+    else
+        echo -e "${C_RED}Flutter binary not found. Install it via 'dev-wizard install android 6'.${C_RESET}"
+        exit 1
+    fi
+}
+
+# CLI: Help page
+cli_help() {
+    cat << EOF
+DEV-WIZARD(1)                   User Commands                  DEV-WIZARD(1)
+
+NAME
+    dev-wizard - Modular Development Environment & Toolchain Orchestrator
+
+SYNOPSIS
+    dev-wizard [COMMAND] [OPTIONS]
+    dev-wizard                              (launches interactive TUI)
+
+COMMANDS
+    scan, -s [CATEGORY]
+        Perform diagnostic scan across all categories or a specified discipline.
+        Categories: android, ios, web, ai, tools, core
+
+    install, -i <CATEGORY> [TOOLS|all]
+        Perform direct headless installation of tools in a category.
+        Example: dev-wizard install web 1,3
+        Example: dev-wizard install ai all
+
+    doctor, -d
+        Execute Flutter Doctor and Android toolchain verification.
+
+    install-cli
+        Symlink dev-wizard into ~/.local/bin for global system access.
+
+    list, -l [CATEGORY]
+        Display all registered toolchains and their check functions.
+
+    --help, -h
+        Display this manual page.
+
+    --version, -v
+        Display dev-wizard version information.
+
+CATEGORIES
+    android     Java 21, cmdline-tools, platform-tools, SDK 34/36, build-tools, Flutter
+    ios         usbmuxd, libimobiledevice, ideviceinstaller, CocoaPods
+    web         Node.js, pnpm, yarn, PostgreSQL, Redis, Docker, Chrome
+    ai          Python3, pip, venv, Ollama, PyTorch, JupyterLab, Hugging Face
+    tools       VS Code, gh CLI, Postman, DBeaver, Git Cola, Tmux & Htop
+    core        Git Config, GitHub SSH Key (~/.ssh/id_ed25519), C/C++ Build Essentials
+
+EXAMPLES
+    dev-wizard
+    dev-wizard scan
+    dev-wizard scan web
+    dev-wizard install web 1,2
+    dev-wizard install ai all
+    dev-wizard doctor
+
+AUTHOR
+    Mwenda Boniface (https://github.com/Mwenda-Boniface)
+
+EOF
+}
+
+# ==============================================================================
+# INTERACTIVE TUI HANDLERS
+# ==============================================================================
+handle_tui_category() {
+    local cat_title="$1"
+    local cat_array_name="$2"
+
+    eval "local tool_list=(\"\${${cat_array_name}[@]}\")"
+    local total_tools=${#tool_list[@]}
+
+    while true; do
+        draw_banner
+        echo -e "${C_DARK_G}┌─[ ${C_EMERALD}${C_BOLD}DISCIPLINE: $cat_title${C_RESET}${C_DARK_G} ]${C_RESET}"
+        echo -e "${C_DARK_G}│${C_RESET} ${C_GRAY}Scanning toolchain state...${C_RESET}"
+        echo -e "${C_DARK_G}│${C_RESET}"
+
+        local installed_count=0
+        local uninstalled_names=()
+        local uninstalled_installers=()
+
+        for idx in "${!tool_list[@]}"; do
+            local item="${tool_list[$idx]}"
+            local name="${item%%|*}"
+            local rest="${item#*|}"
+            local check_fn="${rest%%|*}"
+            local install_fn="${rest#*|}"
+
+            if $check_fn; then
+                badge_ok "$name"
+                ((installed_count++))
+            else
+                badge_missing "$name"
+                uninstalled_names+=("$name")
+                uninstalled_installers+=("$install_fn")
+            fi
+        done
+
+        echo -e "${C_DARK_G}├───────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+        echo -e "${C_DARK_G}│${C_RESET}  ${C_BOLD}Status:${C_RESET} ${C_EMERALD}$installed_count${C_RESET} of ${C_WHITE}$total_tools${C_RESET} tools verified."
+        echo -e "${C_DARK_G}└───────────────────────────────────────────────────────────────────────────┘${C_RESET}"
+
+        if [ ${#uninstalled_names[@]} -eq 0 ]; then
+            echo -e "\n  ${C_EMERALD}${C_BOLD}[OK] All tools in this discipline are verified and active.${C_RESET}\n"
+            echo -e "  ${C_WHITE}[R]${C_RESET} Force reinstall / re-run a specific tool"
+            echo -e "  ${C_WHITE}[0]${C_RESET} Return to Main Menu"
+            echo ""
+            echo -n "  Select option: "
+            read -r r_choice || return 0
+            if [[ "$r_choice" =~ ^[Rr]$ ]]; then
+                echo -e "\n  Enter tool number to re-run (1-$total_tools): "
+                read -r re_idx || continue
+                if [[ "$re_idx" =~ ^[0-9]+$ ]] && [ "$re_idx" -ge 1 ] && [ "$re_idx" -le "$total_tools" ]; then
+                    local target_item="${tool_list[$((re_idx-1))]}"
+                    local t_rest="${target_item#*|}"
+                    local t_install="${t_rest#*|}"
+                    $t_install
+                    pause
+                fi
+                continue
+            else
+                return 0
+            fi
+        fi
+
+        echo -e "\n  ${C_WHITE}${C_BOLD}Select uninstalled tools to provision:${C_RESET}"
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        for u_idx in "${!uninstalled_names[@]}"; do
+            echo -e "  ${C_MINT}[ $((u_idx + 1)) ]${C_RESET} ${C_BOLD}${uninstalled_names[$u_idx]}${C_RESET}"
+        done
+        echo -e "  ${C_EMERALD}[ A ]${C_RESET} ${C_BOLD}Install ALL uninstalled tools listed above${C_RESET}"
+        echo -e "  ${C_GRAY}[ 0 ] Return to Main Menu${C_RESET}"
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo ""
+        echo -e "  ${C_GRAY}Enter numbers separated by commas (e.g. 1,2 or 1,3 or 'A' or '0'):${C_RESET}"
+        echo -n "  >>> "
+        read -r user_selection || return 0
+
+        if [[ "$user_selection" =~ ^[0bBqQ]$ ]]; then
+            return 0
+        fi
+
+        if [[ "$user_selection" =~ ^[Aa]$ ]]; then
+            echo -e "\n${C_EMERALD}==> Provisioning all ${#uninstalled_names[@]} missing tools...${C_RESET}\n"
+            for u_idx in "${!uninstalled_names[@]}"; do
+                echo -e "\n${C_DARK_G}┌─[ ${C_WHITE}Installing ($((u_idx+1))/${#uninstalled_names[@]}): ${uninstalled_names[$u_idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
+                ${uninstalled_installers[$u_idx]}
+            done
+            sync_env
+            persist_env
+            echo -e "\n${C_EMERALD}${C_BOLD}[OK] Batch provisioning completed successfully.${C_RESET}"
+            pause
+            continue
+        fi
+
+        IFS=',' read -ra SELECTED_ITEMS <<< "$user_selection"
+        local count=0
+        for sel in "${SELECTED_ITEMS[@]}"; do
+            sel=$(echo "$sel" | xargs)
+            if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#uninstalled_names[@]}" ]; then
+                local t_idx=$((sel - 1))
+                echo -e "\n${C_DARK_G}┌─[ ${C_WHITE}Installing: ${uninstalled_names[$t_idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
+                ${uninstalled_installers[$t_idx]}
+                ((count++))
+            else
+                echo -e "${C_RED}Skipping invalid selection index: $sel${C_RESET}"
+            fi
+        done
+
+        if [ "$count" -gt 0 ]; then
+            sync_env
+            persist_env
+            echo -e "\n${C_EMERALD}${C_BOLD}[OK] Provisioning complete.${C_RESET}"
+            pause
+        fi
+    done
+}
+
+# ==============================================================================
+# MAIN INTERACTIVE TUI LOOP
+# ==============================================================================
+tui_main() {
+    while true; do
+        draw_banner
+        echo -e "  ${C_WHITE}${C_BOLD}Select a toolchain discipline to inspect or provision:${C_RESET}"
+        echo ""
+        echo -e "  ${C_EMERALD}[ 01 ]${C_RESET} ${C_BOLD}Android Development${C_RESET}"
+        echo -e "         ${C_GRAY}Flutter, Java 21, cmdline-tools, platform SDKs 34/36, build-tools${C_RESET}"
+        echo ""
+        echo -e "  ${C_EMERALD}[ 02 ]${C_RESET} ${C_BOLD}iOS Development (Linux Compatibility Stack)${C_RESET}"
+        echo -e "         ${C_GRAY}usbmuxd, libimobiledevice, ideviceinstaller, CocoaPods${C_RESET}"
+        echo ""
+        echo -e "  ${C_EMERALD}[ 03 ]${C_RESET} ${C_BOLD}Web Development${C_RESET}"
+        echo -e "         ${C_GRAY}Node.js, npm, pnpm, yarn, PostgreSQL, Redis, Docker, Chrome${C_RESET}"
+        echo ""
+        echo -e "  ${C_EMERALD}[ 04 ]${C_RESET} ${C_BOLD}AI & Machine Learning Development${C_RESET}"
+        echo -e "         ${C_GRAY}Python 3, Ollama (Local LLMs), PyTorch, NumPy, JupyterLab, Hugging Face${C_RESET}"
+        echo ""
+        echo -e "  ${C_EMERALD}[ 05 ]${C_RESET} ${C_BOLD}Development Softwares & IDEs${C_RESET}"
+        echo -e "         ${C_GRAY}VS Code, GitHub CLI (gh), Postman, DBeaver, Git Cola, Tmux & Htop${C_RESET}"
+        echo ""
+        echo -e "  ${C_EMERALD}[ 06 ]${C_RESET} ${C_BOLD}Core System Tools & Git / GitHub${C_RESET}"
+        echo -e "         ${C_GRAY}Git Identity, GitHub SSH Key (~/.ssh/id_ed25519), C/C++ Build Essentials${C_RESET}"
+        echo ""
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_BOLD}Run Full System Diagnostic Scan (All Categories)${C_RESET}"
+        echo -e "  ${C_WHITE}[ D ]${C_RESET} ${C_BOLD}Run Flutter Doctor Diagnostic${C_RESET}"
+        echo -e "  ${C_WHITE}[ C ]${C_RESET} ${C_BOLD}Install 'dev-wizard' to ~/.local/bin (Global CLI Access)${C_RESET}"
+        echo -e "  ${C_GRAY}[ 0 ] Exit${C_RESET}"
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo ""
+        echo -n "  Enter choice [1-6, S, D, C, 0]: "
+        read -r choice || exit 0
+
+        case "$choice" in
+            1|01) handle_tui_category "ANDROID DEVELOPMENT" "TOOLS_ANDROID" ;;
+            2|02) handle_tui_category "IOS DEVELOPMENT (LINUX TOOLS)" "TOOLS_IOS" ;;
+            3|03) handle_tui_category "WEB DEVELOPMENT" "TOOLS_WEB" ;;
+            4|04) handle_tui_category "AI & MACHINE LEARNING" "TOOLS_AI" ;;
+            5|05) handle_tui_category "DEVELOPMENT SOFTWARES" "TOOLS_SOFTWARE" ;;
+            6|06) handle_tui_category "CORE SYSTEM TOOLS & GIT" "TOOLS_CORE" ;;
+            [sS]) cli_scan "" ;;
+            [dD]) cli_doctor ;;
+            [cC]) cli_install_binary; pause ;;
+            0|[qQ])
+                echo -e "\n${C_EMERALD}Exiting dev-wizard. Happy coding.${C_RESET}\n"
+                exit 0
+                ;;
+            *)
+                echo -e "\n${C_RED}Invalid option.${C_RESET}"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# ==============================================================================
+# CLI DISPATCH ROUTER
+# ==============================================================================
+case "$1" in
+    scan|-s|--scan)
+        cli_scan "$2"
+        ;;
+    install|-i|--install)
+        cli_install "$2" "$3"
+        ;;
+    doctor|-d|--doctor)
+        cli_doctor
+        ;;
+    install-cli|--install-cli)
+        cli_install_binary
+        ;;
+    list|-l|--list)
+        cli_scan "$2"
+        ;;
+    --version|-v)
+        echo "dev-wizard version 2.1.0 (x86_64-linux-gnu)"
+        exit 0
+        ;;
+    --help|-h|help)
+        cli_help
+        exit 0
+        ;;
+    "")
+        tui_main
+        ;;
+    *)
+        echo -e "${C_RED}Unknown command: $1${C_RESET}"
+        echo "Use 'dev-wizard --help' for usage instructions."
+        exit 1
+        ;;
+esac
