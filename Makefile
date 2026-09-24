@@ -25,24 +25,27 @@ help:
 	@echo "  make scan        - Run headless full system scan"
 	@echo "  make doctor      - Run Flutter/Android doctor diagnostics"
 	@echo "  make cleaner     - Run Linux system cleaner & diagnostics"
+	@echo "  make desktop     - Create desktop app launcher with custom logo"
 	@echo "  make test        - Validate bash syntax of executable"
 
 install:
 	@mkdir -p $(BINDIR)
-	@chmod +x bin/ghost-stack launch.sh run.sh system-cleaner.sh scripts/system-cleaner.sh 2>/dev/null || true
+	@chmod +x bin/ghost-stack launch.sh run.sh system-cleaner.sh scripts/*.sh 2>/dev/null || true
 	@ln -sf $(CURDIR)/bin/ghost-stack $(BINDIR)/ghost-stack
 	@ln -sf $(CURDIR)/system-cleaner.sh $(BINDIR)/ghost-stack-clean 2>/dev/null || true
+	@if [ ! -d "/data/data/com.termux" ]; then \
+		bash scripts/create-desktop-app.sh 2>/dev/null || true; \
+	fi
+	@echo "[OK] 'ghost-stack' successfully installed to $(BINDIR)/ghost-stack"
+	@echo "You can now run 'ghost-stack' from anywhere in your terminal!"
+
+desktop:
+	@chmod +x scripts/create-desktop-app.sh 2>/dev/null || true
+	@bash scripts/create-desktop-app.sh
 
 cleaner clean-system:
 	@chmod +x system-cleaner.sh scripts/system-cleaner.sh 2>/dev/null || true
 	@sudo ./system-cleaner.sh
-	@if [ ! -d "/data/data/com.termux" ]; then \
-		mkdir -p $(DESKTOPDIR); \
-		cp Ghost-Stack.desktop $(DESKTOPDIR)/ghost-stack.desktop 2>/dev/null || true; \
-		which update-desktop-database >/dev/null 2>&1 && update-desktop-database $(DESKTOPDIR) || true; \
-	fi
-	@echo "[OK] 'ghost-stack' successfully installed to $(BINDIR)/ghost-stack"
-	@echo "You can now run 'ghost-stack' from anywhere in your terminal!"
 
 uninstall:
 	@rm -f $(BINDIR)/ghost-stack $(BINDIR)/dev-wizard

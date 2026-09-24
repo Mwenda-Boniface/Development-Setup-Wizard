@@ -1289,6 +1289,20 @@ run_system_cleaner() {
     pause
 }
 
+run_create_desktop_app() {
+    local desktop_script="$ROOT_DIR/scripts/create-desktop-app.sh"
+    if [ ! -f "$desktop_script" ]; then
+        desktop_script="$ROOT_DIR/create-desktop-app.sh"
+    fi
+    if [ ! -f "$desktop_script" ]; then
+        echo -e "\n${C_RED}[ERROR] create-desktop-app.sh not found in $ROOT_DIR/scripts${C_RESET}\n"
+        pause
+        return 1
+    fi
+    bash "$desktop_script"
+    pause
+}
+
 # ==============================================================================
 # STYLED & COLORED HELP RENDERERS (WITH EXIT & BACK NAVIGATION)
 # ==============================================================================
@@ -1683,24 +1697,24 @@ on_winch_signal() {
 }
 trap 'on_winch_signal' WINCH
 
-tui_main() {
-    clear
-    local need_clear=false
-    local choice=""
+render_home_dashboard() {
+    local choice="$1"
+    local force_clear="$2"
+    
+    if [ "$force_clear" = true ]; then
+        clear
+    else
+        printf "\033[?25l\033[H"
+    fi
 
-    while true; do
-        if [ "$need_clear" = true ] || [ "$G_WINCH_EVENT" = true ]; then
-            clear
-            need_clear=false
-            G_WINCH_EVENT=false
-        else
-            printf "\033[H"
-        fi
+    draw_banner --no-clear
+    draw_home_telemetry
+    local t_cols t_lines
+    t_cols=$(get_current_cols)
+    t_lines=$(tput lines 2>/dev/null || echo 24)
 
-        draw_banner --no-clear
-        draw_home_telemetry
-        local t_cols
-        t_cols=$(get_current_cols)
+    if [ "$IS_TERMUX" = true ]; then
+        # Mobile layout (< 42 cols)
         echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Android Development${C_RESET}"
         echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}iOS Development (Linux Stack)${C_RESET}"
         echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Web Development${C_RESET}"
@@ -1708,17 +1722,53 @@ tui_main() {
         echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Development Softwares & IDEs${C_RESET}"
         echo -e "  ${C_WHITE}[ 6 ]${C_RESET} ${C_LIGHT_G}Core System Tools & DevOps${C_RESET}"
         echo -e "  ${C_WHITE}[ 7 ]${C_RESET} ${C_LIGHT_G}System Cleaner & Diagnostics${C_RESET}"
-        if [ "$IS_TERMUX" = true ]; then
-            echo -e "  ${C_WHITE}[S]${C_RESET} ${C_LIGHT_G}Scan${C_RESET}  ${C_WHITE}[D]${C_RESET} ${C_LIGHT_G}Doc${C_RESET}  ${C_WHITE}[H]${C_RESET} ${C_LIGHT_G}Help${C_RESET}  ${C_WHITE}[0]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
+        echo -e "  ${C_WHITE}[ 8 ]${C_RESET} ${C_LIGHT_G}Desktop App & Custom Logo${C_RESET}"
+        echo -e "  ${C_WHITE}[S]${C_RESET} ${C_LIGHT_G}Scan${C_RESET}  ${C_WHITE}[D]${C_RESET} ${C_LIGHT_G}Doc${C_RESET}  ${C_WHITE}[H]${C_RESET} ${C_LIGHT_G}Help${C_RESET}  ${C_WHITE}[0]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
+    else
+        # PC / Desktop Linux layout:
+        if [ "$t_lines" -lt 28 ] || [ "$t_cols" -lt 65 ]; then
+            # Compact PC Mode (Under 28 lines or under 65 cols):
+            # Uses compact grid so height NEVER exceeds 16 lines! No scrolling possible!
+            echo -e "  ${C_WHITE}[ 1 ]${C_RESET} Android   ${C_WHITE}[ 2 ]${C_RESET} iOS       ${C_WHITE}[ 3 ]${C_RESET} Web"
+            echo -e "  ${C_WHITE}[ 4 ]${C_RESET} AI/ML     ${C_WHITE}[ 5 ]${C_RESET} Softwares ${C_WHITE}[ 6 ]${C_RESET} DevOps"
+            echo -e "  ${C_WHITE}[ 7 ]${C_RESET} Cleaner   ${C_WHITE}[ 8 ]${C_RESET} Desktop App & Custom Logo"
+            echo -e "  ${C_WHITE}[ S ]${C_RESET} Scan  ${C_WHITE}[ D ]${C_RESET} Doctor  ${C_WHITE}[ H ]${C_RESET} Help  ${C_WHITE}[ R ]${C_RESET} Refresh  ${C_WHITE}[ 0 ]${C_RESET} Exit"
         else
+            # Standard / Maximized PC Mode (>= 28 lines):
+            echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Android Development${C_RESET}"
+            echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}iOS Development (Linux Stack)${C_RESET}"
+            echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Web Development${C_RESET}"
+            echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}AI & Machine Learning${C_RESET}"
+            echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Development Softwares & IDEs${C_RESET}"
+            echo -e "  ${C_WHITE}[ 6 ]${C_RESET} ${C_LIGHT_G}Core System Tools & DevOps${C_RESET}"
+            echo -e "  ${C_WHITE}[ 7 ]${C_RESET} ${C_LIGHT_G}System Cleaner & Diagnostics${C_RESET}"
+            echo -e "  ${C_WHITE}[ 8 ]${C_RESET} ${C_LIGHT_G}Desktop Launcher & Custom Logo${C_RESET}"
             echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_LIGHT_G}Full Diagnostic Scan${C_RESET}"
             echo -e "  ${C_WHITE}[ D ]${C_RESET} ${C_LIGHT_G}Flutter & Android Doctor${C_RESET}"
             echo -e "  ${C_WHITE}[ H ]${C_RESET} ${C_LIGHT_G}Help & Navigation Manual${C_RESET}"
             echo -e "  ${C_WHITE}[ R ]${C_RESET} ${C_LIGHT_G}Refresh Screen${C_RESET}"
             echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
         fi
-        echo ""
-        echo -ne "  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}${choice}\033[K"
+    fi
+    echo ""
+    echo -ne "  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}${choice}\033[K"
+    printf "\033[?25h"
+}
+
+tui_main() {
+    local need_clear=true
+    local choice=""
+    local last_cpu=""
+    local last_ram=""
+
+    while true; do
+        if [ "$need_clear" = true ] || [ "$G_WINCH_EVENT" = true ]; then
+            render_home_dashboard "$choice" true
+            need_clear=false
+            G_WINCH_EVENT=false
+            last_cpu=$(get_cpu_speed)
+            last_ram=$(get_mem_info)
+        fi
 
         local key=""
         if IFS= read -rs -n 1 -t 1 key; then
@@ -1738,6 +1788,7 @@ tui_main() {
                     5|05) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" "tools" ;;
                     6|06) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" "core" ;;
                     7|07|[cC]|clean|cleaner) run_system_cleaner; continue ;;
+                    8|08|desktop|app) run_create_desktop_app; continue ;;
                     [sS]) cli_scan ""; pause ;;
                     [dD]) cli_doctor; pause ;;
                     [hH]) handle_help_menu ;;
@@ -1752,9 +1803,11 @@ tui_main() {
                 esac
             elif [[ $key == $'\177' || $key == $'\b' ]]; then
                 choice="${choice%?}"
+                echo -ne "\r  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}${choice}\033[K"
             else
                 choice="${choice}${key}"
-                if [[ "$choice" =~ ^[1-7sShHdDrRqQ0cC]$ ]]; then
+                echo -ne "\r  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}${choice}\033[K"
+                if [[ "$choice" =~ ^[1-8sShHdDrRqQ0cC]$ ]]; then
                     local selected="$choice"
                     choice=""
                     need_clear=true
@@ -1767,6 +1820,7 @@ tui_main() {
                         5) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" "tools" ;;
                         6) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" "core" ;;
                         7|[cC]) run_system_cleaner; continue ;;
+                        8) run_create_desktop_app; continue ;;
                         [sS]) cli_scan ""; pause ;;
                         [dD]) cli_doctor; pause ;;
                         [hH]) handle_help_menu ;;
@@ -1778,7 +1832,15 @@ tui_main() {
                 fi
             fi
         else
-            :
+            # 1-second timeout: check if telemetry values changed
+            local cur_cpu cur_ram
+            cur_cpu=$(get_cpu_speed)
+            cur_ram=$(get_mem_info)
+            if [ "$cur_cpu" != "$last_cpu" ] || [ "$cur_ram" != "$last_ram" ]; then
+                last_cpu="$cur_cpu"
+                last_ram="$cur_ram"
+                render_home_dashboard "$choice" false
+            fi
         fi
     done
 }
@@ -1798,6 +1860,10 @@ case "$1" in
         ;;
     clean|cleaner|cleanup)
         run_system_cleaner
+        exit $?
+        ;;
+    desktop|app|create-desktop)
+        run_create_desktop_app
         exit $?
         ;;
     install-cli|--install-cli)

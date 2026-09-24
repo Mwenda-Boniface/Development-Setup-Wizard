@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f0d"/>
+      <stop offset="50%" stop-color="#0d1814"/>
+      <stop offset="100%" stop-color="#050a08"/>
+    </linearGradient>
+    <linearGradient id="neon-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00ff88"/>
+      <stop offset="50%" stop-color="#00e5ff"/>
+      <stop offset="100%" stop-color="#00b468"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Rounded Shield -->
+  <rect x="12" y="12" width="232" height="232" rx="48" fill="url(#bg-grad)" stroke="#1a3328" stroke-width="4"/>
+  <rect x="16" y="16" width="224" height="224" rx="44" fill="none" stroke="url(#neon-glow)" stroke-width="2" stroke-opacity="0.4"/>
+
+  <!-- Circuit Lines Background -->
+  <path d="M 40 80 L 70 80 L 90 100" fill="none" stroke="#00ff88" stroke-width="2" stroke-opacity="0.25"/>
+  <circle cx="40" cy="80" r="3" fill="#00ff88" fill-opacity="0.5"/>
+  <path d="M 216 80 L 186 80 L 166 100" fill="none" stroke="#00ff88" stroke-width="2" stroke-opacity="0.25"/>
+  <circle cx="216" cy="80" r="3" fill="#00ff88" fill-opacity="0.5"/>
+
+  <!-- Ghost Head & Body Silhouette -->
+  <path d="M 128 46 
+           C 84 46, 62 82, 62 124 
+           L 62 186 
+           C 62 194, 76 198, 84 188 
+           C 92 178, 102 178, 110 188 
+           C 118 198, 138 198, 146 188 
+           C 154 178, 164 178, 172 188 
+           C 180 198, 194 194, 194 186 
+           L 194 124 
+           C 194 82, 172 46, 128 46 Z" 
+        fill="#081c14" stroke="url(#neon-glow)" stroke-width="6" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Eyes - Glowing Cyan/Emerald Visor -->
+  <ellipse cx="102" cy="118" rx="14" ry="18" fill="#00ffcc" filter="url(#glow)"/>
+  <ellipse cx="154" cy="118" rx="14" ry="18" fill="#00ffcc" filter="url(#glow)"/>
+  <ellipse cx="104" cy="116" rx="5" ry="7" fill="#ffffff"/>
+  <ellipse cx="156" cy="116" rx="5" ry="7" fill="#ffffff"/>
+
+  <!-- Terminal Prompt Symbol in Ghost Center -->
+  <path d="M 112 148 L 122 156 L 112 164" fill="none" stroke="#00ff88" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="128" y1="164" x2="142" y2="164" stroke="#00ff88" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Ghost Stack Bottom Banner Label -->
+  <rect x="42" y="206" width="172" height="24" rx="6" fill="#002b1a" stroke="#00ff88" stroke-width="1.5"/>
+  <text x="128" y="222" font-family="monospace, monospace" font-size="12" font-weight="900" fill="#00ff88" text-anchor="middle" letter-spacing="3">GHOST-STACK</text>
+</svg>

@@ -1,10 +1,12 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Ghost-Stack Toolchain Wizard
-Comment=Modular Development Environment & Toolchain Orchestrator
-Exec=bash -c 'U_HOME="$HOME"; [ -z "$U_HOME" ] && U_HOME="/home/$(id -un)"; LAUNCH="$U_HOME/Desktop/setup-wizard/launch.sh"; [ ! -f "$LAUNCH" ] && LAUNCH="$U_HOME/setup-wizard/launch.sh"; if [ -f "$LAUNCH" ]; then exec "$LAUNCH"; elif command -v ghost-stack >/dev/null 2>&1; then exec ghost-stack; else echo "Error: ghost-stack launcher not found in $U_HOME"; sleep 3; fi'
-Icon=utilities-terminal
+Name=Ghost-Stack
+GenericName=Development Environment & Toolchain Orchestrator
+Comment=Launch Ghost-Stack Development Orchestrator & System Cleaner
+Exec=bash -c 'if command -v ghost-stack >/dev/null 2>&1; then exec qterminal -e ghost-stack || exec x-terminal-emulator -e ghost-stack || exec bash -c ghost-stack; else exec "/home/bonnie/Desktop/setup-wizard/bin/ghost-stack"; fi'
+Icon=/home/bonnie/Desktop/setup-wizard/assets/ghost-stack.png
 Terminal=false
-Categories=Development;
+Categories=Development;System;Utility;
 StartupNotify=true
+Keywords=ghost;stack;dev;tools;cleaner;doctor;
