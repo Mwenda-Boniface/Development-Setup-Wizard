@@ -24,12 +24,18 @@ help:
 	@echo "  make run         - Run interactive TUI directly"
 	@echo "  make scan        - Run headless full system scan"
 	@echo "  make doctor      - Run Flutter/Android doctor diagnostics"
+	@echo "  make cleaner     - Run Linux system cleaner & diagnostics"
 	@echo "  make test        - Validate bash syntax of executable"
 
 install:
 	@mkdir -p $(BINDIR)
-	@chmod +x bin/ghost-stack launch.sh run.sh
+	@chmod +x bin/ghost-stack launch.sh run.sh system-cleaner.sh scripts/system-cleaner.sh 2>/dev/null || true
 	@ln -sf $(CURDIR)/bin/ghost-stack $(BINDIR)/ghost-stack
+	@ln -sf $(CURDIR)/system-cleaner.sh $(BINDIR)/ghost-stack-clean 2>/dev/null || true
+
+cleaner clean-system:
+	@chmod +x system-cleaner.sh scripts/system-cleaner.sh 2>/dev/null || true
+	@sudo ./system-cleaner.sh
 	@if [ ! -d "/data/data/com.termux" ]; then \
 		mkdir -p $(DESKTOPDIR); \
 		cp Ghost-Stack.desktop $(DESKTOPDIR)/ghost-stack.desktop 2>/dev/null || true; \

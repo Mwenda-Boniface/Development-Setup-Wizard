@@ -78,6 +78,21 @@ Installs a symlink to `~/.local/bin/ghost-stack` (or `$PREFIX/bin/ghost-stack` o
 
 ---
 
+### 6. Linux System Cleaner & Diagnostics (`clean` or `cleaner`)
+```bash
+ghost-stack clean
+```
+Launches the full interactive Linux System Cleaner & Diagnostics suite. Automates cache pruning (`~/.cache`), system journal trimming (`journalctl --vacuum-size=200M`), APT package cache cleanup, `/tmp` temporary file clearing, Trash clearing, and full storage/hardware diagnostics.
+
+Can also be invoked directly:
+```bash
+sudo make cleaner
+# or
+sudo ./system-cleaner.sh
+```
+
+---
+
 ### 6. In-Terminal Help Navigation Controls
 When viewing any documentation topic inside the interactive viewer:
 - `[ B ]`: Return to previous section (Help Index)
