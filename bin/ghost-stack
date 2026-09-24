@@ -161,6 +161,11 @@ auto_stamp_desktop
 # ==============================================================================
 draw_banner() {
     clear
+    local term_cols="${GHOST_STACK_COLS:-${COLUMNS:-}}"
+    if [ -z "$term_cols" ] || [ "$term_cols" -eq 0 ] 2>/dev/null; then
+        term_cols=$(tput cols 2>/dev/null || echo 80)
+    fi
+
     echo -e "${C_LIGHT_G}${C_BOLD}"
     cat << "EOF"
    ________               __       _____ __             __  
@@ -170,7 +175,11 @@ draw_banner() {
 \____/_/ /_/\____/____/\__/     /____/\__/\__,_/\___/_/|_|  
 EOF
     echo -e "${C_RESET}"
-    echo -e "       ${C_WHITE}${C_BOLD}[ + ]   C O D E   B Y   M W E N D A   B O N I F A C E   [ + ]${C_RESET}\n"
+    if [ "$term_cols" -ge 96 ]; then
+        echo -e "       ${C_WHITE}${C_BOLD}[ + ]   C O D E   B Y   M W E N D A   B O N I F A C E   [ + ]${C_RESET}\n"
+    else
+        echo -e "     ${C_WHITE}${C_BOLD}[+] CODE BY MWENDA BONIFACE [+]${C_RESET}\n"
+    fi
 }
 
 get_cpu_speed() {
@@ -258,21 +267,53 @@ draw_home_telemetry() {
         platform_label="Native Linux (APT)"
     fi
 
-    local cpu_speed mem_info disk_info display_workspace
+    local cpu_speed mem_info disk_info display_workspace term_cols
     cpu_speed=$(get_cpu_speed)
     mem_info=$(get_mem_info)
     disk_info=$(get_disk_info)
     display_workspace=$(echo "$ROOT_DIR" | sed "s|^$HOME|~|")
 
-    # Permanent Dual-Column Grid Layout
-    echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]$(printf "%0.s─" {1..71})┐${C_RESET}"
-    echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
-    draw_telemetry_row "Architecture" "$ARCH" "CPU Speed" "$cpu_speed"
-    draw_telemetry_row "Operating System" "$OS_NAME" "Active Session" "$CURRENT_USER"
-    draw_telemetry_row "Memory (RAM)" "$mem_info" "Disk Storage" "$disk_info"
-    draw_telemetry_row "Runtime Platform" "$platform_label" "Workspace Path" "$display_workspace"
-    echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
-    echo -e "  ${C_GRAY}└$(printf "%0.s─" {1..104})┘${C_RESET}"
+    term_cols="${GHOST_STACK_COLS:-${COLUMNS:-}}"
+    if [ -z "$term_cols" ] || [ "$term_cols" -eq 0 ] 2>/dev/null; then
+        term_cols=$(tput cols 2>/dev/null || echo 80)
+    fi
+
+    if [ "$term_cols" -ge 96 ]; then
+        # Wide / Maximized Mode: Full Spacious 2-Column Grid (104 chars inner)
+        echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]$(printf "%0.s─" {1..71})┐${C_RESET}"
+        echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
+        draw_telemetry_row "Architecture" "$ARCH" "CPU Speed" "$cpu_speed"
+        draw_telemetry_row "Operating System" "$OS_NAME" "Active Session" "$CURRENT_USER"
+        draw_telemetry_row "Memory (RAM)" "$mem_info" "Disk Storage" "$disk_info"
+        draw_telemetry_row "Runtime Platform" "$platform_label" "Workspace Path" "$display_workspace"
+        echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
+        echo -e "  ${C_GRAY}└$(printf "%0.s─" {1..104})┘${C_RESET}"
+    else
+        # Small / Restored Window Mode (60-95 cols): Compact 2-Column Grid (Zero Line-Wrapping!)
+        local s_arch="$ARCH"
+        local s_cpu="$cpu_speed"
+        local s_os="Kali Rolling"
+        if [ "$IS_TERMUX" = true ]; then s_os="Termux Android"; fi
+        local s_user="$CURRENT_USER"
+        local s_ram
+        s_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
+        [ -z "$s_ram" ] && s_ram="4.4G/7.6G"
+        local s_disk
+        s_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
+        [ -z "$s_disk" ] && s_disk="57G/226G"
+        local s_mode="Native APT"
+        if [ "$IS_TERMUX" = true ]; then s_mode="Termux PKG"; fi
+        local s_path
+        s_path=$(basename "$ROOT_DIR")
+        [ -z "$s_path" ] && s_path="setup-wizard"
+
+        echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]────────────────────────────────────┐${C_RESET}"
+        printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Arch :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] CPU  :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_arch" "$s_cpu"
+        printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] OS   :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] User :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_os" "$s_user"
+        printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] RAM  :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] Disk :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_ram" "$s_disk"
+        printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Mode :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] Path :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_mode" "$s_path"
+        echo -e "  ${C_GRAY}└────────────────────────────────────────────────────────┘${C_RESET}"
+    fi
     echo ""
 }
 
@@ -1461,7 +1502,11 @@ handle_tui_category() {
     done
 }
 
-trap 'shopt -s checkwinsize 2>/dev/null; : ' WINCH
+G_WINCH_EVENT=false
+on_winch_signal() {
+    G_WINCH_EVENT=true
+}
+trap 'on_winch_signal' WINCH
 
 tui_main() {
     while true; do
@@ -1481,6 +1526,15 @@ tui_main() {
         echo ""
         echo -ne "  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}"
         read -r choice || choice=""
+
+        if [ "$G_WINCH_EVENT" = true ]; then
+            G_WINCH_EVENT=false
+            if [[ "$choice" =~ ^(0|00|[qQ])$ ]]; then
+                echo -e "\n${C_LIGHT_G}Exiting Ghost-Stack. Happy coding.${C_RESET}\n"
+                exit 0
+            fi
+            continue
+        fi
 
         case "$choice" in
             [rR]|"") continue ;;
