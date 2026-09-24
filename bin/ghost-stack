@@ -209,7 +209,9 @@ auto_stamp_desktop
 # UI RENDERERS & TELEMETRY
 # ==============================================================================
 draw_banner() {
-    clear
+    if [ "$1" != "--no-clear" ]; then
+        clear
+    fi
     local term_cols
     term_cols=$(get_current_cols)
 
@@ -242,16 +244,18 @@ EOF
 
 get_cpu_speed() {
     local speed=""
-    if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ]; then
+    if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] || [ -d /sys/devices/system/cpu/cpufreq ]; then
         local khz
-        khz=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
+        khz=$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq 2>/dev/null | sort -nr 2>/dev/null | head -n 1)
+        [ -z "$khz" ] && khz=$(cat /sys/devices/system/cpu/cpufreq/policy*/scaling_cur_freq 2>/dev/null | sort -nr 2>/dev/null | head -n 1)
+        [ -z "$khz" ] && khz=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
         if [ -n "$khz" ] && [ "$khz" -gt 0 ] 2>/dev/null; then
             speed=$(awk -v k="$khz" 'BEGIN {printf "%.2f GHz", k/1000000}')
         fi
     fi
     if [ -z "$speed" ] && [ -f /proc/cpuinfo ]; then
         local mhz
-        mhz=$(awk -F: '/cpu MHz/{print $2; exit}' /proc/cpuinfo 2>/dev/null | xargs)
+        mhz=$(awk -F: '/cpu MHz/{print $2}' /proc/cpuinfo 2>/dev/null | sort -nr 2>/dev/null | head -n 1 | xargs)
         if [ -n "$mhz" ]; then
             speed=$(awk -v m="$mhz" 'BEGIN {printf "%.2f GHz", m/1000}')
         fi
@@ -1597,8 +1601,20 @@ on_winch_signal() {
 trap 'on_winch_signal' WINCH
 
 tui_main() {
+    clear
+    local need_clear=false
+    local choice=""
+
     while true; do
-        draw_banner
+        if [ "$need_clear" = true ] || [ "$G_WINCH_EVENT" = true ]; then
+            clear
+            need_clear=false
+            G_WINCH_EVENT=false
+        else
+            printf "\033[H"
+        fi
+
+        draw_banner --no-clear
         draw_home_telemetry
         local t_cols
         t_cols=$(get_current_cols)
@@ -1618,38 +1634,66 @@ tui_main() {
             echo -e "  ${C_WHITE}[S]${C_RESET} ${C_LIGHT_G}Scan${C_RESET}  ${C_WHITE}[D]${C_RESET} ${C_LIGHT_G}Doc${C_RESET}  ${C_WHITE}[H]${C_RESET} ${C_LIGHT_G}Help${C_RESET}  ${C_WHITE}[0]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
         fi
         echo ""
-        echo -ne "  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}"
-        read -r choice || choice=""
+        echo -ne "  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}${choice}\033[K"
 
-        if [ "$G_WINCH_EVENT" = true ]; then
-            G_WINCH_EVENT=false
-            if [[ "$choice" =~ ^(0|00|[qQ])$ ]]; then
-                echo -e "\n${C_LIGHT_G}Exiting Ghost-Stack. Happy coding.${C_RESET}\n"
-                exit 0
+        local key=""
+        if IFS= read -rs -n 1 -t 1 key; then
+            if [[ $key == $'\0' || $key == $'\n' ]]; then
+                local selected="$choice"
+                choice=""
+                if [ -z "$selected" ]; then
+                    continue
+                fi
+                need_clear=true
+                case "$selected" in
+                    [rR]) continue ;;
+                    1|01) handle_tui_category "ANDROID DEVELOPMENT" "TOOLS_ANDROID" "android" ;;
+                    2|02) handle_tui_category "IOS DEVELOPMENT (LINUX STACK)" "TOOLS_IOS" "ios" ;;
+                    3|03) handle_tui_category "WEB DEVELOPMENT" "TOOLS_WEB" "web" ;;
+                    4|04) handle_tui_category "AI & MACHINE LEARNING" "TOOLS_AI" "ai" ;;
+                    5|05) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" "tools" ;;
+                    6|06) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" "core" ;;
+                    [sS]) cli_scan ""; pause ;;
+                    [dD]) cli_doctor; pause ;;
+                    [hH]) handle_help_menu ;;
+                    0|00|[qQ])
+                        echo -e "\n${C_LIGHT_G}Exiting Ghost-Stack. Happy coding.${C_RESET}\n"
+                        exit 0
+                        ;;
+                    *)
+                        echo -e "\n${C_RED}Invalid option: $selected${C_RESET}"
+                        sleep 0.6
+                        ;;
+                esac
+            elif [[ $key == $'\177' || $key == $'\b' ]]; then
+                choice="${choice%?}"
+            else
+                choice="${choice}${key}"
+                if [[ "$choice" =~ ^[1-6sShHdDrRqQ0]$ ]]; then
+                    local selected="$choice"
+                    choice=""
+                    need_clear=true
+                    case "$selected" in
+                        [rR]) continue ;;
+                        1) handle_tui_category "ANDROID DEVELOPMENT" "TOOLS_ANDROID" "android" ;;
+                        2) handle_tui_category "IOS DEVELOPMENT (LINUX STACK)" "TOOLS_IOS" "ios" ;;
+                        3) handle_tui_category "WEB DEVELOPMENT" "TOOLS_WEB" "web" ;;
+                        4) handle_tui_category "AI & MACHINE LEARNING" "TOOLS_AI" "ai" ;;
+                        5) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" "tools" ;;
+                        6) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" "core" ;;
+                        [sS]) cli_scan ""; pause ;;
+                        [dD]) cli_doctor; pause ;;
+                        [hH]) handle_help_menu ;;
+                        0|[qQ])
+                            echo -e "\n${C_LIGHT_G}Exiting Ghost-Stack. Happy coding.${C_RESET}\n"
+                            exit 0
+                            ;;
+                    esac
+                fi
             fi
-            continue
+        else
+            :
         fi
-
-        case "$choice" in
-            [rR]|"") continue ;;
-            1|01) handle_tui_category "ANDROID DEVELOPMENT" "TOOLS_ANDROID" "android" ;;
-            2|02) handle_tui_category "IOS DEVELOPMENT (LINUX STACK)" "TOOLS_IOS" "ios" ;;
-            3|03) handle_tui_category "WEB DEVELOPMENT" "TOOLS_WEB" "web" ;;
-            4|04) handle_tui_category "AI & MACHINE LEARNING" "TOOLS_AI" "ai" ;;
-            5|05) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" "tools" ;;
-            6|06) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" "core" ;;
-            [sS]) cli_scan ""; pause ;;
-            [dD]) cli_doctor; pause ;;
-            [hH]) handle_help_menu ;;
-            0|00|[qQ])
-                echo -e "\n${C_LIGHT_G}Exiting Ghost-Stack. Happy coding.${C_RESET}\n"
-                exit 0
-                ;;
-            *)
-                echo -e "\n${C_RED}Invalid option.${C_RESET}"
-                sleep 0.5
-                ;;
-        esac
     done
 }
 
