@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # DEV-WIZARD // SYSTEM & TOOLCHAIN ORCHESTRATOR
-# Version: 2.2.0
-# License: MIT
+# Version: 2.3.0
+# Author: Mwenda Boniface (https://github.com/Mwenda-Boniface)
 # Platform: Linux (Debian, Ubuntu, Kali, Mint, Pop!_OS)
-# Style: Minimalist Terminal Emerald Green (Strictly Zero Emojis)
+# Style: Cyberpunk Terminal Green (Strictly Zero Emojis)
 # Architecture: 100% Dynamic User & Multi-User Agnostic
 # ==============================================================================
 
@@ -40,13 +40,13 @@ else
 fi
 
 # ==============================================================================
-# COLOR PALETTE (EMERALD GREEN THEME - ZERO EMOJIS)
+# COLOR PALETTE (TERMINAL GREEN // ZERO EMOJIS)
 # ==============================================================================
 C_EMERALD="\033[38;5;48m"   # Bright glowing emerald
+C_LIGHT_G="\033[1;32m"      # Classic vibrant light green
 C_MINT="\033[38;5;84m"      # Crisp readable mint green
-C_FOREST="\033[38;5;35m"    # Mid forest green
 C_DARK_G="\033[38;5;29m"    # Deep border green
-C_WHITE="\033[1;37m"        # High contrast white
+C_WHITE="\033[1;37m"        # High contrast bold white
 C_GRAY="\033[38;5;244m"     # Technical muted gray
 C_RED="\033[1;31m"          # Failure / missing
 C_YELLOW="\033[1;33m"       # Warning / attention
@@ -55,7 +55,7 @@ C_DIM="\033[2m"
 C_RESET="\033[0m"
 
 # Status Badges (Strictly Zero Emojis)
-badge_ok()      { echo -e "  ${C_EMERALD}${C_BOLD}[ OK ]${C_RESET}       $1"; }
+badge_ok()      { echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ]${C_RESET}       $1"; }
 badge_missing() { echo -e "  ${C_RED}${C_BOLD}[ MISSING ]${C_RESET}  $1"; }
 badge_warn()    { echo -e "  ${C_YELLOW}${C_BOLD}[ WARN ]${C_RESET}     $1"; }
 badge_info()    { echo -e "  ${C_MINT}${C_BOLD}[ INFO ]${C_RESET}     $1"; }
@@ -110,13 +110,21 @@ auto_stamp_desktop() {
 }
 auto_stamp_desktop
 
+# ==============================================================================
+# UI RENDERERS (MATCHING SCREENSHOT AESTHETIC)
+# ==============================================================================
 draw_banner() {
     clear
-    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}DEV-WIZARD // SYSTEM & TOOLCHAIN ORCHESTRATOR${C_RESET}                        ${C_DARK_G}v2.2.0${C_RESET}  ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_GRAY}Active Executor:${C_RESET} ${C_WHITE}${CURRENT_USER}${C_RESET} ${C_GRAY}(${CURRENT_HOME})${C_RESET}                                              ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_GRAY}Modular Environment Provisioning, State Diagnostics & Package Matrix${C_RESET}             ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+    echo -e "${C_LIGHT_G}${C_BOLD}"
+    cat << "EOF"
+    ____                _       ___                      __
+   / __ \___ _   __    | |     / (_)___  ____ __________/ /
+  / / / / _ \ | / /____| | /| / / /_  / / __ `/ ___/ __  / 
+ / /_/ /  __/ |/ /_____/ |/ |/ / / / /_/ /_/ / /  / /_/ /  
+/_____/\___/|___/      |__/|__/_/ /___/\__,_/_/   \__,_/   
+EOF
+    echo -e "${C_RESET}"
+    echo -e "       ${C_WHITE}${C_BOLD}[ + ]   C O D E   B Y   M W E N D A   B O N I F A C E   [ + ]${C_RESET}"
     echo ""
 }
 
@@ -257,7 +265,7 @@ install_cocoapods() {
 
 check_fastlane() { command -v fastlane >/dev/null 2>&1; }
 install_fastlane() {
-    echo -e "${C_MINT}Installing Fastlane (App Deployment Automation)...${C_RESET}"
+    echo -e "${C_MINT}Installing Fastlane (Mobile Deployment Automation)...${C_RESET}"
     sudo apt update && sudo apt install -y ruby-full build-essential
     sudo gem install fastlane || true
 }
@@ -316,7 +324,7 @@ install_docker() {
     sudo apt update && sudo apt install -y docker.io docker-compose-plugin docker-compose
     sudo systemctl enable --now docker || true
     sudo usermod -aG docker "$CURRENT_USER" || true
-    echo -e "${C_EMERALD}Docker installed. Group activation applies on new terminal session.${C_RESET}"
+    echo -e "${C_LIGHT_G}Docker installed. Group activation applies on new terminal session.${C_RESET}"
 }
 
 check_nginx() { command -v nginx >/dev/null 2>&1; }
@@ -427,7 +435,7 @@ Terminal=false
 Type=Application
 Categories=Development;
 EOF
-    echo -e "${C_EMERALD}Postman installed successfully.${C_RESET}"
+    echo -e "${C_LIGHT_G}Postman installed successfully.${C_RESET}"
 }
 
 check_insomnia() { command -v insomnia >/dev/null 2>&1; }
@@ -500,7 +508,7 @@ install_github_ssh() {
     ssh-keygen -t ed25519 -C "$email" -f "$CURRENT_HOME/.ssh/id_ed25519" -N ""
     chmod 600 "$CURRENT_HOME/.ssh/id_ed25519"
     chmod 644 "$CURRENT_HOME/.ssh/id_ed25519.pub"
-    echo -e "\n${C_EMERALD}Public Key (Copy to https://github.com/settings/keys):${C_RESET}"
+    echo -e "\n${C_LIGHT_G}Public Key (Copy to https://github.com/settings/keys):${C_RESET}"
     cat "$CURRENT_HOME/.ssh/id_ed25519.pub"
     echo ""
     read -rp "Press [Enter] to test connection..."
@@ -653,7 +661,7 @@ cli_scan() {
         }
         local title
         title=$(get_category_title "$target_cat")
-        echo -e "${C_DARK_G}┌─[ ${C_EMERALD}${C_BOLD}DIAGNOSTIC SCAN: $title${C_RESET}${C_DARK_G} ]${C_RESET}"
+        echo -e "${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}DIAGNOSTIC SCAN: $title${C_RESET}${C_DARK_G} ]${C_RESET}"
         eval "local tools=(\"\${${arr_name}[@]}\")"
         local missing=0
         for item in "${tools[@]}"; do
@@ -671,10 +679,8 @@ cli_scan() {
         [ "$missing" -eq 0 ] && exit 0 || exit 1
     fi
 
-    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}COMPREHENSIVE TOOLCHAIN DIAGNOSTIC SCAN (EXECUTOR: ${CURRENT_USER})${C_RESET}               ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
-    echo ""
+    draw_banner
+    echo -e "  ${C_WHITE}${C_BOLD}COMPREHENSIVE TOOLCHAIN DIAGNOSTIC SCAN (EXECUTOR: ${CURRENT_USER})${C_RESET}\n"
 
     local categories=("TOOLS_ANDROID" "TOOLS_IOS" "TOOLS_WEB" "TOOLS_AI" "TOOLS_SOFTWARE" "TOOLS_CORE")
     local titles=("ANDROID DEVELOPMENT" "IOS DEVELOPMENT (LINUX TOOLS)" "WEB DEVELOPMENT" "AI & MACHINE LEARNING" "DEVELOPMENT SOFTWARES" "CORE SYSTEM TOOLS & DEVOPS")
@@ -683,7 +689,7 @@ cli_scan() {
     local total_passed=0
 
     for idx in "${!categories[@]}"; do
-        echo -e "${C_DARK_G}┌─[ ${C_MINT}${C_BOLD}${titles[$idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
+        echo -e "${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}${titles[$idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
         eval "local tools=(\"\${${categories[$idx]}[@]}\")"
         for item in "${tools[@]}"; do
             local name="${item%%|*}"
@@ -700,12 +706,12 @@ cli_scan() {
         echo -e "${C_DARK_G}└─────────────────────────────────────────────────────────${C_RESET}\n"
     done
 
-    echo -e "${C_WHITE}${C_BOLD}Scan Summary:${C_RESET} ${C_EMERALD}$total_passed${C_RESET} of ${C_WHITE}$total_checked${C_RESET} tools verified."
+    echo -e "  ${C_WHITE}${C_BOLD}Scan Summary:${C_RESET} ${C_LIGHT_G}$total_passed${C_RESET} of ${C_WHITE}$total_checked${C_RESET} tools verified."
     if [ "$total_passed" -eq "$total_checked" ]; then
-        echo -e "${C_EMERALD}${C_BOLD}Status: All required developer tools are verified!${C_RESET}"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}Status: All required developer tools are verified!${C_RESET}\n"
         exit 0
     else
-        echo -e "${C_YELLOW}${C_BOLD}Status: Missing tools detected.${C_RESET}"
+        echo -e "  ${C_YELLOW}${C_BOLD}Status: Missing tools detected.${C_RESET}\n"
         exit 1
     fi
 }
@@ -742,14 +748,14 @@ cli_install() {
     done
 
     if [ ${#uninstalled_names[@]} -eq 0 ]; then
-        echo -e "${C_EMERALD}[OK] All tools in category '$cat_input' are already installed.${C_RESET}"
+        echo -e "${C_LIGHT_G}[OK] All tools in category '$cat_input' are already installed.${C_RESET}"
         exit 0
     fi
 
     if [ -z "$tools_input" ]; then
         echo -e "${C_YELLOW}Missing tools in category '$cat_input':${C_RESET}"
         for i in "${!uninstalled_names[@]}"; do
-            echo -e "  [$((i+1))] ${uninstalled_names[$i]}"
+            echo -e "  [ $((i+1)) ] ${uninstalled_names[$i]}"
         done
         echo ""
         echo "Run with selection, e.g.: dev-wizard install $cat_input 1,2 or dev-wizard install $cat_input all"
@@ -779,7 +785,7 @@ cli_install() {
     sync_env
     persist_env
     auto_stamp_desktop
-    echo -e "\n${C_EMERALD}${C_BOLD}[OK] Batch installation completed.${C_RESET}"
+    echo -e "\n${C_LIGHT_G}${C_BOLD}[OK] Batch installation completed.${C_RESET}"
 }
 
 cli_install_binary() {
@@ -795,17 +801,15 @@ cli_install_binary() {
     fi
     
     persist_env
-    echo -e "${C_EMERALD}${C_BOLD}[OK] 'dev-wizard' has been installed to $CURRENT_HOME/.local/bin/dev-wizard${C_RESET}"
-    echo -e "${C_EMERALD}${C_BOLD}[OK] Desktop launcher stamped and signed for user: ${CURRENT_USER}${C_RESET}"
+    echo -e "${C_LIGHT_G}${C_BOLD}[OK] 'dev-wizard' has been installed to $CURRENT_HOME/.local/bin/dev-wizard${C_RESET}"
+    echo -e "${C_LIGHT_G}${C_BOLD}[OK] Desktop launcher stamped and signed for user: ${CURRENT_USER}${C_RESET}"
     echo -e "You can now run ${C_WHITE}${C_BOLD}dev-wizard${C_RESET} directly from any terminal directory!"
 }
 
 cli_doctor() {
     sync_env
-    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}FLUTTER & ANDROID TOOLCHAIN DOCTOR (USER: ${CURRENT_USER})${C_RESET}                         ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
-    echo ""
+    draw_banner
+    echo -e "  ${C_WHITE}${C_BOLD}FLUTTER & ANDROID TOOLCHAIN DOCTOR (USER: ${CURRENT_USER})${C_RESET}\n"
     if command -v flutter >/dev/null 2>&1; then
         flutter doctor -v
     elif [ -x "$FLUTTER_DIR/bin/flutter" ]; then
@@ -814,6 +818,60 @@ cli_doctor() {
         echo -e "${C_RED}Flutter binary not found. Install it via 'dev-wizard install android 9'.${C_RESET}"
         exit 1
     fi
+}
+
+# ==============================================================================
+# HELP & DOCUMENTATION VIEWER
+# ==============================================================================
+show_help_file() {
+    local doc_file="$ROOT_DIR/help/$1"
+    if [ ! -f "$doc_file" ]; then
+        echo -e "${C_RED}Help file not found: $doc_file${C_RESET}"
+        pause
+        return
+    fi
+    clear
+    if command -v less >/dev/null 2>&1; then
+        less -R "$doc_file"
+    else
+        cat "$doc_file"
+        pause
+    fi
+}
+
+handle_help_menu() {
+    while true; do
+        draw_banner
+        echo -e "  ${C_WHITE}${C_BOLD}[ + ]   H E L P   &   N A V I G A T I O N   M A N U A L   [ + ]${C_RESET}\n"
+        echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Getting Started & Installation Guide${C_RESET}"
+        echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}CLI Commands & Headless Automation Reference${C_RESET}"
+        echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Toolchain Catalog & Discipline Details${C_RESET}"
+        echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}Troubleshooting & FAQ${C_RESET}"
+        echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}System Architecture (implementation.md)${C_RESET}"
+        echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_GRAY}Return to Main Menu${C_RESET}"
+        echo ""
+        echo -ne "  ${C_WHITE}${C_BOLD}@dev-wizard[help]~# ${C_RESET}"
+        read -r h_choice || return 0
+
+        case "$h_choice" in
+            1) show_help_file "01-getting-started.md" ;;
+            2) show_help_file "02-commands.md" ;;
+            3) show_help_file "03-toolchains.md" ;;
+            4) show_help_file "04-troubleshooting.md" ;;
+            5)
+                if [ -f "$ROOT_DIR/implementation.md" ]; then
+                    if command -v less >/dev/null 2>&1; then
+                        less -R "$ROOT_DIR/implementation.md"
+                    else
+                        cat "$ROOT_DIR/implementation.md"
+                        pause
+                    fi
+                fi
+                ;;
+            0|[qQ]) return 0 ;;
+            *) sleep 0.5 ;;
+        esac
+    done
 }
 
 cli_help() {
@@ -846,8 +904,8 @@ COMMANDS
     list, -l [CATEGORY]
         Display all registered toolchains and their check functions.
 
-    --help, -h
-        Display this manual page.
+    help, -h, --help [TOPIC]
+        Display documentation topic (getting-started, commands, toolchains, troubleshooting).
 
     --version, -v
         Display dev-wizard version information.
@@ -859,6 +917,9 @@ CATEGORIES
     ai          Python3, pip, venv, Ollama, PyTorch, Scikit-Learn, Transformers, ChromaDB, JupyterLab, HF CLI
     tools       VS Code, gh CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux & Htop
     core        Git Config, SSH Key, C/C++ Essentials, Rust, Go, jq/ripgrep/fzf, Network Tools
+
+DOCUMENTATION DIRECTORY
+    See full markdown guides in $ROOT_DIR/help/
 
 AUTHOR
     Mwenda Boniface (https://github.com/Mwenda-Boniface)
@@ -872,15 +933,14 @@ EOF
 handle_tui_category() {
     local cat_title="$1"
     local cat_array_name="$2"
+    local cat_slug="$3"
 
     eval "local tool_list=(\"\${${cat_array_name}[@]}\")"
     local total_tools=${#tool_list[@]}
 
     while true; do
         draw_banner
-        echo -e "${C_DARK_G}┌─[ ${C_EMERALD}${C_BOLD}DISCIPLINE: $cat_title${C_RESET}${C_DARK_G} ]${C_RESET}"
-        echo -e "${C_DARK_G}│${C_RESET} ${C_GRAY}Scanning toolchain state for ${CURRENT_USER}...${C_RESET}"
-        echo -e "${C_DARK_G}│${C_RESET}"
+        echo -e "  ${C_WHITE}${C_BOLD}[ + ]   $cat_title   [ + ]${C_RESET}\n"
 
         local installed_count=0
         local uninstalled_names=()
@@ -903,19 +963,20 @@ handle_tui_category() {
             fi
         done
 
-        echo -e "${C_DARK_G}├───────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
-        echo -e "${C_DARK_G}│${C_RESET}  ${C_BOLD}Status:${C_RESET} ${C_EMERALD}$installed_count${C_RESET} of ${C_WHITE}$total_tools${C_RESET} tools verified."
-        echo -e "${C_DARK_G}└───────────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
+        echo ""
+        echo -e "  ${C_GRAY}─────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_WHITE}${C_BOLD}Status:${C_RESET} ${C_LIGHT_G}$installed_count${C_RESET} of ${C_WHITE}$total_tools${C_RESET} tools verified."
+        echo -e "  ${C_GRAY}─────────────────────────────────────────────────────────────────${C_RESET}"
 
         if [ ${#uninstalled_names[@]} -eq 0 ]; then
-            echo -e "\n  ${C_EMERALD}${C_BOLD}[OK] All tools in this discipline are verified and active.${C_RESET}\n"
-            echo -e "  ${C_WHITE}[R]${C_RESET} Force reinstall / re-run a specific tool"
-            echo -e "  ${C_WHITE}[0]${C_RESET} Return to Main Menu"
+            echo -e "\n  ${C_LIGHT_G}${C_BOLD}[ OK ] All tools in this discipline are verified and active.${C_RESET}\n"
+            echo -e "  ${C_WHITE}[ R ]${C_RESET} ${C_LIGHT_G}Force reinstall / re-run a specific tool${C_RESET}"
+            echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_GRAY}Return to Main Menu${C_RESET}"
             echo ""
-            echo -n "  Select option: "
+            echo -ne "  ${C_WHITE}${C_BOLD}@dev-wizard[${cat_slug}]~# ${C_RESET}"
             read -r r_choice || return 0
             if [[ "$r_choice" =~ ^[Rr]$ ]]; then
-                echo -e "\n  Enter tool number to re-run (1-$total_tools): "
+                echo -ne "\n  Enter tool number to re-run (1-$total_tools): "
                 read -r re_idx || continue
                 if [[ "$re_idx" =~ ^[0-9]+$ ]] && [ "$re_idx" -ge 1 ] && [ "$re_idx" -le "$total_tools" ]; then
                     local target_item="${tool_list[$((re_idx-1))]}"
@@ -931,16 +992,16 @@ handle_tui_category() {
         fi
 
         echo -e "\n  ${C_WHITE}${C_BOLD}Select uninstalled tools to provision:${C_RESET}"
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_GRAY}─────────────────────────────────────────────────────────────────${C_RESET}"
         for u_idx in "${!uninstalled_names[@]}"; do
-            echo -e "  ${C_MINT}[ $((u_idx + 1)) ]${C_RESET} ${C_BOLD}${uninstalled_names[$u_idx]}${C_RESET}"
+            echo -e "  ${C_WHITE}[ $((u_idx + 1)) ]${C_RESET} ${C_LIGHT_G}${uninstalled_names[$u_idx]}${C_RESET}"
         done
-        echo -e "  ${C_EMERALD}[ A ]${C_RESET} ${C_BOLD}Install ALL uninstalled tools listed above${C_RESET}"
-        echo -e "  ${C_GRAY}[ 0 ] Return to Main Menu${C_RESET}"
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_WHITE}[ A ]${C_RESET} ${C_LIGHT_G}Install ALL uninstalled tools listed above${C_RESET}"
+        echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_GRAY}Return to Main Menu${C_RESET}"
+        echo -e "  ${C_GRAY}─────────────────────────────────────────────────────────────────${C_RESET}"
         echo ""
         echo -e "  ${C_GRAY}Enter numbers separated by commas (e.g. 1,2 or 1,3 or 'A' or '0'):${C_RESET}"
-        echo -n "  >>> "
+        echo -ne "  ${C_WHITE}${C_BOLD}@dev-wizard[${cat_slug}]~# ${C_RESET}"
         read -r user_selection || return 0
 
         if [[ "$user_selection" =~ ^[0bBqQ]$ ]]; then
@@ -948,15 +1009,15 @@ handle_tui_category() {
         fi
 
         if [[ "$user_selection" =~ ^[Aa]$ ]]; then
-            echo -e "\n${C_EMERALD}==> Provisioning all ${#uninstalled_names[@]} missing tools...${C_RESET}\n"
+            echo -e "\n${C_LIGHT_G}==> Provisioning all ${#uninstalled_names[@]} missing tools...${C_RESET}\n"
             for u_idx in "${!uninstalled_names[@]}"; do
-                echo -e "\n${C_DARK_G}┌─[ ${C_WHITE}Installing ($((u_idx+1))/${#uninstalled_names[@]}): ${uninstalled_names[$u_idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
+                echo -e "\n${C_DARK_G}>>> [ $((u_idx+1)) / ${#uninstalled_names[@]} ] Installing: ${uninstalled_names[$u_idx]}${C_RESET}"
                 ${uninstalled_installers[$u_idx]}
             done
             sync_env
             persist_env
             auto_stamp_desktop
-            echo -e "\n${C_EMERALD}${C_BOLD}[OK] Batch provisioning completed successfully.${C_RESET}"
+            echo -e "\n${C_LIGHT_G}${C_BOLD}[ OK ] Batch provisioning completed successfully.${C_RESET}"
             pause
             continue
         fi
@@ -967,7 +1028,7 @@ handle_tui_category() {
             sel=$(echo "$sel" | xargs)
             if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#uninstalled_names[@]}" ]; then
                 local t_idx=$((sel - 1))
-                echo -e "\n${C_DARK_G}┌─[ ${C_WHITE}Installing: ${uninstalled_names[$t_idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
+                echo -e "\n${C_DARK_G}>>> Installing: ${uninstalled_names[$t_idx]}${C_RESET}"
                 ${uninstalled_installers[$t_idx]}
                 ((count++))
             else
@@ -979,62 +1040,49 @@ handle_tui_category() {
             sync_env
             persist_env
             auto_stamp_desktop
-            echo -e "\n${C_EMERALD}${C_BOLD}[OK] Provisioning complete.${C_RESET}"
+            echo -e "\n${C_LIGHT_G}${C_BOLD}[ OK ] Provisioning complete.${C_RESET}"
             pause
         fi
     done
 }
 
+# ==============================================================================
+# MAIN INTERACTIVE TUI LOOP
+# ==============================================================================
 tui_main() {
     while true; do
         draw_banner
-        echo -e "  ${C_WHITE}${C_BOLD}Select a toolchain discipline to inspect or provision:${C_RESET}"
+        echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Android Development${C_RESET}"
+        echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}iOS Development (Linux Stack)${C_RESET}"
+        echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Web Development${C_RESET}"
+        echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}AI & Machine Learning${C_RESET}"
+        echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Development Softwares & IDEs${C_RESET}"
+        echo -e "  ${C_WHITE}[ 6 ]${C_RESET} ${C_LIGHT_G}Core System Tools & DevOps${C_RESET}"
+        echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_LIGHT_G}Full Diagnostic Scan${C_RESET}"
+        echo -e "  ${C_WHITE}[ D ]${C_RESET} ${C_LIGHT_G}Flutter & Android Doctor${C_RESET}"
+        echo -e "  ${C_WHITE}[ H ]${C_RESET} ${C_LIGHT_G}Help & Navigation Manual${C_RESET}"
+        echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
         echo ""
-        echo -e "  ${C_EMERALD}[ 01 ]${C_RESET} ${C_BOLD}Android Development${C_RESET}"
-        echo -e "         ${C_GRAY}Java 21/17, cmdline-tools, platform-tools, SDK 34/36, build-tools, NDK, Flutter, Scrcpy${C_RESET}"
-        echo ""
-        echo -e "  ${C_EMERALD}[ 02 ]${C_RESET} ${C_BOLD}iOS Development (Linux Compatibility Stack)${C_RESET}"
-        echo -e "         ${C_GRAY}usbmuxd, libimobiledevice, ideviceinstaller, ifuse, plist-utils, CocoaPods, Fastlane${C_RESET}"
-        echo ""
-        echo -e "  ${C_EMERALD}[ 03 ]${C_RESET} ${C_BOLD}Web Development${C_RESET}"
-        echo -e "         ${C_GRAY}Node.js, npm, pnpm, yarn, Bun, Deno, PostgreSQL, Redis, SQLite3, Docker, Nginx, Chrome${C_RESET}"
-        echo ""
-        echo -e "  ${C_EMERALD}[ 04 ]${C_RESET} ${C_BOLD}AI & Machine Learning Development${C_RESET}"
-        echo -e "         ${C_GRAY}Python 3, Ollama, PyTorch, Scikit-Learn, Transformers, ChromaDB, JupyterLab, HF CLI${C_RESET}"
-        echo ""
-        echo -e "  ${C_EMERALD}[ 05 ]${C_RESET} ${C_BOLD}Development Softwares & IDEs${C_RESET}"
-        echo -e "         ${C_GRAY}VS Code, GitHub CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux${C_RESET}"
-        echo ""
-        echo -e "  ${C_EMERALD}[ 06 ]${C_RESET} ${C_BOLD}Core System Tools & DevOps / Security${C_RESET}"
-        echo -e "         ${C_GRAY}Git Identity, SSH Key, C/C++ Build Essentials, Rust, Go, jq/ripgrep/fzf, Nmap${C_RESET}"
-        echo ""
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
-        echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_BOLD}Run Full System Diagnostic Scan (All Categories)${C_RESET}"
-        echo -e "  ${C_WHITE}[ D ]${C_RESET} ${C_BOLD}Run Flutter Doctor Diagnostic${C_RESET}"
-        echo -e "  ${C_WHITE}[ C ]${C_RESET} ${C_BOLD}Install 'dev-wizard' to ~/.local/bin (Permanent Executor Setup)${C_RESET}"
-        echo -e "  ${C_GRAY}[ 0 ] Exit${C_RESET}"
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
-        echo ""
-        echo -n "  Enter choice [1-6, S, D, C, 0]: "
+        echo -ne "  ${C_WHITE}${C_BOLD}@dev-wizard~# ${C_RESET}"
         read -r choice || exit 0
 
         case "$choice" in
-            1|01) handle_tui_category "ANDROID DEVELOPMENT" "TOOLS_ANDROID" ;;
-            2|02) handle_tui_category "IOS DEVELOPMENT (LINUX TOOLS)" "TOOLS_IOS" ;;
-            3|03) handle_tui_category "WEB DEVELOPMENT" "TOOLS_WEB" ;;
-            4|04) handle_tui_category "AI & MACHINE LEARNING" "TOOLS_AI" ;;
-            5|05) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" ;;
-            6|06) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" ;;
-            [sS]) cli_scan "" ;;
-            [dD]) cli_doctor ;;
-            [cC]) cli_install_binary; pause ;;
+            1|01) handle_tui_category "ANDROID DEVELOPMENT" "TOOLS_ANDROID" "android" ;;
+            2|02) handle_tui_category "IOS DEVELOPMENT (LINUX STACK)" "TOOLS_IOS" "ios" ;;
+            3|03) handle_tui_category "WEB DEVELOPMENT" "TOOLS_WEB" "web" ;;
+            4|04) handle_tui_category "AI & MACHINE LEARNING" "TOOLS_AI" "ai" ;;
+            5|05) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" "tools" ;;
+            6|06) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" "core" ;;
+            [sS]) cli_scan ""; pause ;;
+            [dD]) cli_doctor; pause ;;
+            [hH]) handle_help_menu ;;
             0|[qQ])
-                echo -e "\n${C_EMERALD}Exiting dev-wizard. Happy coding.${C_RESET}\n"
+                echo -e "\n${C_LIGHT_G}Exiting dev-wizard. Happy coding.${C_RESET}\n"
                 exit 0
                 ;;
             *)
                 echo -e "\n${C_RED}Invalid option.${C_RESET}"
-                sleep 1
+                sleep 0.5
                 ;;
         esac
     done
@@ -1059,12 +1107,22 @@ case "$1" in
     list|-l|--list)
         cli_scan "$2"
         ;;
-    --version|-v)
-        echo "dev-wizard version 2.2.0 (x86_64-linux-gnu)"
+    help|-h|--help)
+        if [ -n "$2" ]; then
+            case "$2" in
+                getting-started|start|01) show_help_file "01-getting-started.md" ;;
+                commands|cli|02)          show_help_file "02-commands.md" ;;
+                toolchains|tools|03)      show_help_file "03-toolchains.md" ;;
+                troubleshooting|faq|04)   show_help_file "04-troubleshooting.md" ;;
+                *) cli_help ;;
+            esac
+        else
+            cli_help
+        fi
         exit 0
         ;;
-    --help|-h|help)
-        cli_help
+    --version|-v)
+        echo "dev-wizard version 2.3.0 (x86_64-linux-gnu)"
         exit 0
         ;;
     "")
