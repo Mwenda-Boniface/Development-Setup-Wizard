@@ -94,6 +94,13 @@ C_BOLD="\033[1m"
 C_DIM="\033[2m"
 C_RESET="\033[0m"
 
+# Dynamic Telemetry In-Place Coordinates & Auto-Fit Tier
+G_CPU_ROW=""
+G_CPU_COL=""
+G_RAM_ROW=""
+G_RAM_COL=""
+G_LAYOUT_TIER="medium"
+
 # Adaptive Status Badges (Strictly Zero Emojis)
 get_current_cols() {
     local term_cols="${GHOST_STACK_COLS:-${COLUMNS:-}}"
@@ -101,6 +108,14 @@ get_current_cols() {
         term_cols=$(tput cols 2>/dev/null || echo 80)
     fi
     echo "$term_cols"
+}
+
+get_current_lines() {
+    local term_lines="${GHOST_STACK_LINES:-${LINES:-}}"
+    if [ -z "$term_lines" ] || [ "$term_lines" -eq 0 ] 2>/dev/null; then
+        term_lines=$(tput lines 2>/dev/null || echo 24)
+    fi
+    echo "$term_lines"
 }
 
 badge_ok() {
@@ -210,53 +225,88 @@ auto_stamp_desktop
 # ==============================================================================
 # UI RENDERERS & TELEMETRY
 # ==============================================================================
+get_layout_tier() {
+    if [ "$IS_TERMUX" = true ]; then
+        echo "mobile"
+        return
+    fi
+    local t_lines
+    t_lines=$(get_current_lines)
+    if [ "$t_lines" -ge 28 ]; then
+        echo "tall"
+    elif [ "$t_lines" -ge 20 ]; then
+        echo "medium"
+    elif [ "$t_lines" -ge 13 ]; then
+        echo "compact"
+    else
+        echo "tiny"
+    fi
+}
+
 draw_banner() {
     if [ "$1" != "--no-clear" ]; then
         clear
     fi
+    local tier
+    tier=$(get_layout_tier)
     local term_cols
     term_cols=$(get_current_cols)
 
-    echo -e "${C_LIGHT_G}${C_BOLD}"
-    if [ "$IS_TERMUX" = true ]; then
-        # 1. MOBILE PHONE (TERMUX ON ANDROID) BANNER
-        cat << "EOF"
+    case "$tier" in
+        mobile)
+            echo -e "${C_LIGHT_G}${C_BOLD}"
+            cat << "EOF"
   ___ _  _  ___  ___ _____
  / __| || |/ _ \/ __|_   _|
 | (_ | __ | (_) \__ \ | |  
  \___|_||_|\___/|___/ |_|  
 EOF
-        echo -e "${C_RESET}  ${C_WHITE}${C_BOLD}[+] G H O S T - S T A C K [+]${C_RESET}"
-        echo -e "   ${C_GRAY}By Mwenda Boniface (Termux Mobile)${C_RESET}\n"
-    else
-        # 2. PC / DESKTOP LINUX (Kali Linux, Ubuntu, Debian, etc.)
-        if [ "$term_cols" -ge 65 ]; then
-            cat << "EOF"
+            echo -e "${C_RESET}  ${C_WHITE}${C_BOLD}[+] G H O S T - S T A C K [+]${C_RESET}"
+            echo -e "   ${C_GRAY}By Mwenda Boniface (Termux Mobile)${C_RESET}"
+            ;;
+        tall)
+            echo -e "${C_LIGHT_G}${C_BOLD}"
+            if [ "$term_cols" -ge 65 ]; then
+                cat << "EOF"
    ________               __       _____ __             __  
   / ____/ /_  ____  _____/ /_     / ___// /_____ ______/ /__
  / / __/ __ \/ __ \/ ___/ __/_____\__ \/ __/ __ `/ ___/ //_/
 / /_/ / / / / /_/ (__  ) /_/_____/__/ / /_/ /_/ / /__/ ,<   
 \____/_/ /_/\____/____/\__/     /____/\__/\__,_/\___/_/|_|  
 EOF
-            echo -e "${C_RESET}"
-            if [ "$term_cols" -ge 96 ]; then
-                echo -e "       ${C_WHITE}${C_BOLD}[ + ]   C O D E   B Y   M W E N D A   B O N I F A C E   [ + ]${C_RESET}\n"
+                echo -e "${C_RESET}"
+                if [ "$term_cols" -ge 96 ]; then
+                    echo -e "       ${C_WHITE}${C_BOLD}[ + ]   C O D E   B Y   M W E N D A   B O N I F A C E   [ + ]${C_RESET}"
+                else
+                    echo -e "     ${C_WHITE}${C_BOLD}[+] CODE BY MWENDA BONIFACE [+]${C_RESET}"
+                fi
             else
-                echo -e "     ${C_WHITE}${C_BOLD}[+] CODE BY MWENDA BONIFACE [+]${C_RESET}\n"
-            fi
-        else
-            # Dedicated PC Minimized / Floating Window Cyberpunk Banner (< 65 cols)
-            cat << "EOF"
+                cat << "EOF"
   ____ _  _  ___  ___ _____   ___ _____ _   ___ _  _ 
  / ___| || |/ _ \/ __|_   _| / __|_   _/_\ / __| |/ /
 | (_ || __ | (_) \__ \ | |   \__ \ | |/ _ \ (__| ' < 
  \____|_||_|\___/|___/ |_|   |___/ |_/_/ \_\___|_|\_\
 EOF
+                local pc_os_badge="DESKTOP LINUX"
+                if echo "$OS_NAME" | grep -qi "kali"; then pc_os_badge="KALI LINUX"; fi
+                echo -e "${C_RESET}  ${C_WHITE}${C_BOLD}[+] GHOST-STACK // ${pc_os_badge} [+]${C_RESET}"
+            fi
+            ;;
+        medium)
             local pc_os_badge="DESKTOP LINUX"
             if echo "$OS_NAME" | grep -qi "kali"; then pc_os_badge="KALI LINUX"; fi
-            echo -e "${C_RESET}  ${C_WHITE}${C_BOLD}[+] GHOST-STACK // ${pc_os_badge} [+]${C_RESET}\n"
-        fi
-    fi
+            echo -e "  ${C_LIGHT_G}${C_BOLD}[ + ] GHOST-STACK // ${pc_os_badge} (${ARCH}) [ + ]${C_RESET}"
+            echo -e "  ${C_GRAY}System & Toolchain Orchestrator by Mwenda Boniface${C_RESET}"
+            ;;
+        compact)
+            local pc_os_badge="DESKTOP LINUX"
+            if echo "$OS_NAME" | grep -qi "kali"; then pc_os_badge="KALI LINUX"; fi
+            echo -e "  ${C_LIGHT_G}${C_BOLD}[+] GHOST-STACK // ${pc_os_badge} (${ARCH}) [+]${C_RESET}"
+            ;;
+        tiny)
+            # Handled inline in telemetry
+            ;;
+    esac
 }
 
 get_cpu_speed() {
@@ -346,12 +396,15 @@ draw_home_telemetry() {
         platform_label="Native Linux (APT)"
     fi
 
-    local cpu_speed mem_info disk_info display_workspace term_cols
+    local cpu_speed mem_info disk_info display_workspace term_cols term_lines tier
     cpu_speed=$(get_cpu_speed)
     mem_info=$(get_mem_info)
     disk_info=$(get_disk_info)
     display_workspace=$(echo "$ROOT_DIR" | sed "s|^$HOME|~|")
     term_cols=$(get_current_cols)
+    term_lines=$(get_current_lines)
+    tier=$(get_layout_tier)
+    G_LAYOUT_TIER="$tier"
 
     # Resolve detected OS name (compact string for small boxes)
     local os_compact="$OS_NAME"
@@ -369,85 +422,158 @@ draw_home_telemetry() {
         fi
     fi
 
-    if [ "$IS_TERMUX" = true ]; then
-        # ==============================================================================
-        # 1. MOBILE PHONE / TERMUX MODE (Strictly for Termux on Android devices)
-        # ==============================================================================
-        local m_arch="$ARCH"
-        local m_cpu="$cpu_speed"
-        local m_os="Termux"
-        local m_user="$CURRENT_USER"
-        local m_ram
-        m_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}' | sed 's/Gi/G/g; s/Mi/M/g')
-        [ -z "$m_ram" ] && m_ram="2.4G/3.7G"
-        local m_disk
-        m_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}' | sed 's/Gi/G/g; s/Mi/M/g')
-        [ -z "$m_disk" ] && m_disk="43G/113G"
+    case "$tier" in
+        mobile)
+            local m_arch="$ARCH"
+            local m_cpu="$cpu_speed"
+            local m_os="Termux"
+            local m_user="$CURRENT_USER"
+            local m_ram
+            m_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}' | sed 's/Gi/G/g; s/Mi/M/g')
+            [ -z "$m_ram" ] && m_ram="2.4G/3.7G"
+            local m_disk
+            m_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}' | sed 's/Gi/G/g; s/Mi/M/g')
+            [ -z "$m_disk" ] && m_disk="43G/113G"
 
-        echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]──────────────┐${C_RESET}"
-        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "Arch" "$m_arch" "CPU" "$m_cpu"
-        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "OS" "$m_os" "User" "$m_user"
-        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "RAM" "$m_ram" "Disk" "$m_disk"
-        echo -e "  ${C_GRAY}└───────────────────────────────────┘${C_RESET}"
+            echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]──────────────┐${C_RESET}"
+            printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "Arch" "$m_arch" "CPU" "$m_cpu"
+            printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "OS" "$m_os" "User" "$m_user"
+            printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "RAM" "$m_ram" "Disk" "$m_disk"
+            echo -e "  ${C_GRAY}└───────────────────────────────────┘${C_RESET}"
 
-    else
-        # ==============================================================================
-        # 2. PC / DESKTOP LINUX MODES (Kali Linux, Ubuntu, Debian, etc.)
-        # ==============================================================================
-        if [ "$term_cols" -ge 96 ]; then
-            # Desktop Wide / Maximized Mode: Full Spacious 2-Column Grid (104 chars)
-            echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]$(printf "%0.s─" {1..71})┐${C_RESET}"
-            echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
-            draw_telemetry_row "Architecture" "$ARCH" "CPU Speed" "$cpu_speed"
-            draw_telemetry_row "Operating System" "$OS_NAME" "Active Session" "$CURRENT_USER"
-            draw_telemetry_row "Memory (RAM)" "$mem_info" "Disk Storage" "$disk_info"
-            draw_telemetry_row "Runtime Platform" "$platform_label" "Workspace Path" "$display_workspace"
-            echo -e "  ${C_GRAY}│$(printf "%0.s " {1..104})│${C_RESET}"
-            echo -e "  ${C_GRAY}└$(printf "%0.s─" {1..104})┘${C_RESET}"
-        elif [ "$term_cols" -ge 60 ]; then
-            # Desktop Standard Mode (60-95 cols): 58-char 2-column box
-            local s_arch="$ARCH"
-            local s_cpu="$cpu_speed"
-            local s_os="$os_compact"
-            local s_user="$CURRENT_USER"
-            local s_ram
-            s_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
-            [ -z "$s_ram" ] && s_ram="4.8G/7.6G"
-            local s_disk
-            s_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
-            [ -z "$s_disk" ] && s_disk="57G/226G"
-            local s_mode="Native APT"
-            local s_path
-            s_path=$(basename "$ROOT_DIR")
-            [ -z "$s_path" ] && s_path="setup-wizard"
+            G_CPU_ROW=8
+            G_CPU_COL=29
+            G_RAM_ROW=10
+            G_RAM_COL=10
+            ;;
 
-            echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]────────────────────────────────────┐${C_RESET}"
-            printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Arch :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] CPU  :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_arch" "$s_cpu"
-            printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] OS   :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] User :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_os" "$s_user"
-            printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] RAM  :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] Disk :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_ram" "$s_disk"
-            printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Mode :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] Path :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_mode" "$s_path"
-            echo -e "  ${C_GRAY}└────────────────────────────────────────────────────────┘${C_RESET}"
-        else
-            # Desktop Minimized / Floating Window Mode (< 60 cols)
-            local p_arch="$ARCH"
-            local p_cpu="$cpu_speed"
-            local p_os="$os_compact"
-            local p_user="$CURRENT_USER"
-            local p_ram
-            p_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
-            [ -z "$p_ram" ] && p_ram="4.8G/7.6G"
-            local p_disk
-            p_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
-            [ -z "$p_disk" ] && p_disk="57G/226G"
+        tall)
+            if [ "$term_cols" -ge 96 ]; then
+                echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]$(printf "%0.s─" {1..71})┐${C_RESET}"
+                draw_telemetry_row "Architecture" "$ARCH" "CPU Speed" "$cpu_speed"
+                draw_telemetry_row "Operating System" "$OS_NAME" "Active Session" "$CURRENT_USER"
+                draw_telemetry_row "Memory (RAM)" "$mem_info" "Disk Storage" "$disk_info"
+                draw_telemetry_row "Runtime Platform" "$platform_label" "Workspace Path" "$display_workspace"
+                echo -e "  ${C_GRAY}└$(printf "%0.s─" {1..104})┘${C_RESET}"
 
-            echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}PC TELEMETRY // ${p_os^^}${C_RESET} ${C_GRAY}]─────────────────┐${C_RESET}"
-            printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}OS   :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_MINT}Arch :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$p_os" "$p_arch"
-            printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}User :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_MINT}CPU  :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$p_user" "$p_cpu"
-            printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}RAM  :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_MINT}Disk :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$p_ram" "$p_disk"
-            echo -e "  ${C_GRAY}└──────────────────────────────────────────────────┘${C_RESET}"
-        fi
-    fi
-    echo ""
+                G_CPU_ROW=8
+                G_CPU_COL=79
+                G_RAM_ROW=10
+                G_RAM_COL=29
+            elif [ "$term_cols" -ge 60 ]; then
+                local s_arch="$ARCH"
+                local s_cpu="$cpu_speed"
+                local s_os="$os_compact"
+                local s_user="$CURRENT_USER"
+                local s_ram
+                s_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
+                [ -z "$s_ram" ] && s_ram="4.8G/7.6G"
+                local s_disk
+                s_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
+                [ -z "$s_disk" ] && s_disk="57G/226G"
+                local s_mode="Native APT"
+                local s_path
+                s_path=$(basename "$ROOT_DIR")
+                [ -z "$s_path" ] && s_path="setup-wizard"
+
+                echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]────────────────────────────────────┐${C_RESET}"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Arch :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] CPU  :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_arch" "$s_cpu"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] OS   :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] User :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_os" "$s_user"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] RAM  :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] Disk :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_ram" "$s_disk"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Mode :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] Path :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_mode" "$s_path"
+                echo -e "  ${C_GRAY}└────────────────────────────────────────────────────────┘${C_RESET}"
+
+                G_CPU_ROW=8
+                G_CPU_COL=43
+                G_RAM_ROW=10
+                G_RAM_COL=17
+            else
+                local p_arch="$ARCH"
+                local p_cpu="$cpu_speed"
+                local p_os="$os_compact"
+                local p_user="$CURRENT_USER"
+                local p_ram
+                p_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
+                [ -z "$p_ram" ] && p_ram="4.8G/7.6G"
+                local p_disk
+                p_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
+                [ -z "$p_disk" ] && p_disk="57G/226G"
+
+                echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}PC TELEMETRY // ${p_os^^}${C_RESET} ${C_GRAY}]─────────────────┐${C_RESET}"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}OS   :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_MINT}Arch :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$p_os" "$p_arch"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}User :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_MINT}CPU  :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$p_user" "$p_cpu"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}RAM  :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_MINT}Disk :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$p_ram" "$p_disk"
+                echo -e "  ${C_GRAY}└──────────────────────────────────────────────────┘${C_RESET}"
+
+                G_CPU_ROW=8
+                G_CPU_COL=36
+                G_RAM_ROW=9
+                G_RAM_COL=12
+            fi
+            ;;
+
+        medium)
+            local m_ram
+            m_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
+            [ -z "$m_ram" ] && m_ram="4.8G/7.6G"
+            local m_disk
+            m_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
+            [ -z "$m_disk" ] && m_disk="57G/226G"
+
+            if [ "$term_cols" -ge 80 ]; then
+                echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]────────────────────────────────────────┐${C_RESET}"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Arch:${C_RESET} ${C_WHITE}%-8s${C_RESET}   ${C_MINT}[*] CPU :${C_RESET} ${C_WHITE}%-11s${C_RESET}   ${C_MINT}[*] RAM :${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$ARCH" "$cpu_speed" "$m_ram"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] OS  :${C_RESET} ${C_WHITE}%-8s${C_RESET}   ${C_MINT}[*] User:${C_RESET} ${C_WHITE}%-11s${C_RESET}   ${C_MINT}[*] Disk:${C_RESET} ${C_WHITE}%-14s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "$os_compact" "$CURRENT_USER" "$m_disk"
+                echo -e "  ${C_GRAY}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
+
+                G_CPU_ROW=4
+                G_CPU_COL=37
+                G_RAM_ROW=4
+                G_RAM_COL=62
+            else
+                echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]────────────────────────────────────┐${C_RESET}"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Arch:${C_RESET} ${C_WHITE}%-12s${C_RESET}  ${C_MINT}[*] CPU :${C_RESET} ${C_WHITE}%-11s${C_RESET}   ${C_GRAY}│${C_RESET}\n" "$ARCH" "$cpu_speed"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] OS  :${C_RESET} ${C_WHITE}%-12s${C_RESET}  ${C_MINT}[*] User:${C_RESET} ${C_WHITE}%-11s${C_RESET}   ${C_GRAY}│${C_RESET}\n" "$os_compact" "$CURRENT_USER"
+                printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] RAM :${C_RESET} ${C_WHITE}%-12s${C_RESET}  ${C_MINT}[*] Disk:${C_RESET} ${C_WHITE}%-11s${C_RESET}   ${C_GRAY}│${C_RESET}\n" "$m_ram" "$m_disk"
+                echo -e "  ${C_GRAY}└────────────────────────────────────────────────────────┘${C_RESET}"
+
+                G_CPU_ROW=4
+                G_CPU_COL=38
+                G_RAM_ROW=6
+                G_RAM_COL=15
+            fi
+            ;;
+
+        compact)
+            local c_ram
+            c_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
+            [ -z "$c_ram" ] && c_ram="4.8G/7.6G"
+            local c_disk
+            c_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
+            [ -z "$c_disk" ] && c_disk="57G/226G"
+
+            echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}TELEMETRY${C_RESET} ${C_GRAY}]─────────────────────────────────────────────────────────┐${C_RESET}"
+            printf "  ${C_GRAY}│${C_RESET} ${C_MINT}CPU:${C_RESET} ${C_WHITE}%-10s${C_RESET} │ ${C_MINT}RAM:${C_RESET} ${C_WHITE}%-11s${C_RESET} │ ${C_MINT}Disk:${C_RESET} ${C_WHITE}%-9s${C_RESET} │ ${C_MINT}OS:${C_RESET} ${C_WHITE}%-11s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$cpu_speed" "$c_ram" "$c_disk" "$os_compact"
+            echo -e "  ${C_GRAY}└────────────────────────────────────────────────────────────────────────┘${C_RESET}"
+
+            G_CPU_ROW=3
+            G_CPU_COL=10
+            G_RAM_ROW=3
+            G_RAM_COL=28
+            ;;
+
+        tiny)
+            local t_ram
+            t_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
+            [ -z "$t_ram" ] && t_ram="4.8G/7.6G"
+
+            printf "  ${C_LIGHT_G}${C_BOLD}[+] GHOST-STACK${C_RESET} │ ${C_MINT}CPU:${C_RESET} ${C_WHITE}%-9s${C_RESET} │ ${C_MINT}RAM:${C_RESET} ${C_WHITE}%-10s${C_RESET} │ ${C_WHITE}%s${C_RESET}\n" "$cpu_speed" "$t_ram" "$os_compact"
+            G_CPU_ROW=1
+            G_CPU_COL=25
+            G_RAM_ROW=1
+            G_RAM_COL=43
+            ;;
+    esac
 }
 
 pause() {
@@ -1061,8 +1187,46 @@ get_category_title() {
 }
 
 # ==============================================================================
-# CLI EXECUTION MODES
+# CLI EXECUTION MODES (STYLED & HEADLESS CAPABLE)
 # ==============================================================================
+cli_header() {
+    local title="$1"
+    local t_cols
+    t_cols=$(get_current_cols)
+    local cpu_speed mem_info
+    cpu_speed=$(get_cpu_speed)
+    mem_info=$(get_mem_info)
+
+    local pc_os_badge="LINUX"
+    if [ "$IS_TERMUX" = true ]; then
+        pc_os_badge="TERMUX"
+    elif echo "$OS_NAME" | grep -qi "kali"; then
+        pc_os_badge="KALI LINUX"
+    elif echo "$OS_NAME" | grep -qi "ubuntu"; then
+        pc_os_badge="UBUNTU"
+    elif echo "$OS_NAME" | grep -qi "debian"; then
+        pc_os_badge="DEBIAN"
+    fi
+
+    echo -e "${C_LIGHT_G}${C_BOLD}"
+    if [ "$t_cols" -ge 65 ]; then
+        cat << "EOF"
+   ________               __       _____ __             __  
+  / ____/ /_  ____  _____/ /_     / ___// /_____ ______/ /__
+ / / __/ __ \/ __ \/ ___/ __/_____\__ \/ __/ __ `/ ___/ //_/
+/ /_/ / / / / /_/ (__  ) /_/_____/__/ / /_/ /_/ / /__/ ,<   
+\____/_/ /_/\____/____/\__/     /____/\__/\__,_/\___/_/|_|  
+EOF
+    else
+        echo "  [+] GHOST-STACK // ${pc_os_badge} (${ARCH}) [+]"
+    fi
+    echo -e "${C_RESET}"
+    echo -e "  ${C_DARK_G}┌─[ ${C_WHITE}${C_BOLD}${title}${C_RESET} ${C_DARK_G}]────────────────────────────────────────────────────────┐${C_RESET}"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_MINT}[*] Host:${C_RESET} ${C_WHITE}%-18s${C_RESET}  ${C_MINT}[*] User:${C_RESET} ${C_WHITE}%-10s${C_RESET}  ${C_MINT}[*] CPU:${C_RESET} ${C_WHITE}%-12s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "${OS_NAME:0:18}" "$CURRENT_USER" "$cpu_speed"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_MINT}[*] RAM :${C_RESET} ${C_WHITE}%-18s${C_RESET}  ${C_MINT}[*] Path:${C_RESET} ${C_WHITE}%-29s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "$mem_info" "$(basename "$ROOT_DIR")"
+    echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+}
+
 cli_scan() {
     local target_cat="$1"
 
@@ -1075,7 +1239,8 @@ cli_scan() {
         }
         local title
         title=$(get_category_title "$target_cat")
-        echo -e "${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}DIAGNOSTIC SCAN: $title${C_RESET}${C_DARK_G} ]${C_RESET}"
+        cli_header "DIAGNOSTIC SCAN // $title"
+        echo -e "  ${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}${title} TOOLCHAIN${C_RESET} ${C_DARK_G}]──────────────────────────────────────┐${C_RESET}"
         eval "local tools=(\"\${${arr_name}[@]}\")"
         local missing=0
         for item in "${tools[@]}"; do
@@ -1089,12 +1254,18 @@ cli_scan() {
                 ((missing++))
             fi
         done
-        echo -e "${C_DARK_G}└─────────────────────────────────────────────────────────${C_RESET}"
-        [ "$missing" -eq 0 ] && exit 0 || exit 1
+        echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+        if [ "$missing" -eq 0 ]; then
+            echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] All tools in '$title' are verified and active.${C_RESET}\n"
+            exit 0
+        else
+            echo -e "  ${C_YELLOW}${C_BOLD}[ ATTENTION ] $missing uninstalled/missing tool(s) detected.${C_RESET}"
+            echo -e "  To provision: ${C_WHITE}ghost-stack install $target_cat all${C_RESET}\n"
+            exit 1
+        fi
     fi
 
-    draw_banner
-    echo -e "  ${C_WHITE}${C_BOLD}COMPREHENSIVE TOOLCHAIN DIAGNOSTIC SCAN${C_RESET}\n"
+    cli_header "COMPREHENSIVE SYSTEM DIAGNOSTIC SCAN"
 
     local categories=("TOOLS_ANDROID" "TOOLS_IOS" "TOOLS_WEB" "TOOLS_AI" "TOOLS_SOFTWARE" "TOOLS_CORE")
     local titles=("ANDROID DEVELOPMENT" "IOS DEVELOPMENT (LINUX TOOLS)" "WEB DEVELOPMENT" "AI & MACHINE LEARNING" "DEVELOPMENT SOFTWARES" "CORE SYSTEM TOOLS & DEVOPS")
@@ -1103,7 +1274,7 @@ cli_scan() {
     local total_passed=0
 
     for idx in "${!categories[@]}"; do
-        echo -e "${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}${titles[$idx]}${C_RESET}${C_DARK_G} ]${C_RESET}"
+        echo -e "  ${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}${titles[$idx]}${C_RESET} ${C_DARK_G}]──────────────────────────────────────┐${C_RESET}"
         eval "local tools=(\"\${${categories[$idx]}[@]}\")"
         for item in "${tools[@]}"; do
             local name="${item%%|*}"
@@ -1117,17 +1288,49 @@ cli_scan() {
                 badge_missing "$name"
             fi
         done
-        echo -e "${C_DARK_G}└─────────────────────────────────────────────────────────${C_RESET}\n"
+        echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
     done
 
-    echo -e "  ${C_WHITE}${C_BOLD}Scan Summary:${C_RESET} ${C_LIGHT_G}$total_passed${C_RESET} of ${C_WHITE}$total_checked${C_RESET} tools verified."
-    if [ "$total_passed" -eq "$total_checked" ]; then
-        echo -e "  ${C_LIGHT_G}${C_BOLD}Status: All required developer tools are verified!${C_RESET}\n"
-        exit 0
+    local total_missing=$((total_checked - total_passed))
+    echo -e "  ${C_DARK_G}┌─[ ${C_WHITE}${C_BOLD}SCAN DIAGNOSTIC SUMMARY${C_RESET} ${C_DARK_G}]────────────────────────────────────────┐${C_RESET}"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_LIGHT_G}%-41s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Total Tools Evaluated" "$total_checked"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_LIGHT_G}%-41s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Verified & Active" "$total_passed"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_RED}%-41s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Missing / Incomplete" "$total_missing"
+    if [ "$total_missing" -eq 0 ]; then
+        printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_LIGHT_G}%-41s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Overall Status" "ALL SYSTEMS OPERATIONAL"
     else
-        echo -e "  ${C_YELLOW}${C_BOLD}Status: Missing tools detected.${C_RESET}\n"
-        exit 1
+        printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_YELLOW}%-41s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Overall Status" "ACTION REQUIRED - RUN INSTALL"
     fi
+    echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+
+    [ "$total_missing" -eq 0 ] && exit 0 || exit 1
+}
+
+cli_list() {
+    local target_cat="$1"
+    cli_header "REGISTERED TOOLCHAIN INVENTORY"
+    local categories=("TOOLS_ANDROID" "TOOLS_IOS" "TOOLS_WEB" "TOOLS_AI" "TOOLS_SOFTWARE" "TOOLS_CORE")
+    local cat_keys=("android" "ios" "web" "ai" "tools" "core")
+    local titles=("ANDROID DEVELOPMENT" "IOS DEVELOPMENT (LINUX TOOLS)" "WEB DEVELOPMENT" "AI & MACHINE LEARNING" "DEVELOPMENT SOFTWARES" "CORE SYSTEM TOOLS & DEVOPS")
+
+    for idx in "${!categories[@]}"; do
+        if [ -n "$target_cat" ] && [ "$target_cat" != "${cat_keys[$idx]}" ]; then
+            continue
+        fi
+        echo -e "  ${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}${titles[$idx]}${C_RESET} ${C_GRAY}(Key: ${cat_keys[$idx]})${C_RESET} ${C_DARK_G}]──────────────────────┐${C_RESET}"
+        eval "local tools=(\"\${${categories[$idx]}[@]}\")"
+        for item in "${tools[@]}"; do
+            local name="${item%%|*}"
+            local rest="${item#*|}"
+            local check_fn="${rest%%|*}"
+            if $check_fn; then
+                badge_ok "$name"
+            else
+                badge_missing "$name"
+            fi
+        done
+        echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+    done
 }
 
 cli_install() {
@@ -1164,17 +1367,21 @@ cli_install() {
     done
 
     if [ ${#uninstalled_names[@]} -eq 0 ]; then
-        echo -e "${C_LIGHT_G}[OK] All tools in category '$cat_input' are already installed.${C_RESET}"
+        cli_header "TOOLCHAIN PROVISIONER // $cat_input"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] All tools in category '$cat_input' are already installed and active.${C_RESET}\n"
         exit 0
     fi
 
     if [ -z "$tools_input" ]; then
-        echo -e "${C_YELLOW}Missing tools in category '$cat_input':${C_RESET}"
+        cli_header "UNINSTALLED TOOLS IN CATEGORY: $cat_input"
+        echo -e "  ${C_DARK_G}┌─[ ${C_YELLOW}${C_BOLD}PENDING PROVISIONING${C_RESET} ${C_DARK_G}]──────────────────────────────────────────┐${C_RESET}"
         for i in "${!uninstalled_names[@]}"; do
-            echo -e "  [ $((i+1)) ] ${uninstalled_names[$i]}"
+            printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}[ %d ]${C_RESET} %-57s ${C_DARK_G}│${C_RESET}\n" "$((i+1))" "${uninstalled_names[$i]}"
         done
-        echo ""
-        echo "Run with selection, e.g.: ghost-stack install $cat_input 1,2 or ghost-stack install $cat_input all"
+        echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+        echo -e "  ${C_MINT}To install missing tools, run:${C_RESET}"
+        echo -e "    ${C_WHITE}ghost-stack install $cat_input all${C_RESET}        (Install all pending tools)"
+        echo -e "    ${C_WHITE}ghost-stack install $cat_input 1,2${C_RESET}        (Install specific indices)\n"
         exit 0
     fi
 
@@ -1195,6 +1402,7 @@ cli_install() {
         done
     fi
 
+    cli_header "PROVISIONING PIPELINE // $cat_input"
     local verified_count=0
     local failed_count=0
 
@@ -1203,15 +1411,15 @@ cli_install() {
         local t_installer="${uninstalled_installers[$idx]}"
         local t_checker="${uninstalled_checkers[$idx]}"
 
-        echo -e "\n${C_DARK_G}>>> [ $((idx+1)) ] Provisioning: ${C_WHITE}${t_name}${C_RESET}"
+        echo -e "\n  ${C_DARK_G}┌──[ ${C_WHITE}${C_BOLD}STAGE: $t_name${C_RESET} ${C_DARK_G}]───${C_RESET}"
         $t_installer
         sync_env
 
         if $t_checker; then
-            echo -e "  ${C_LIGHT_G}${C_BOLD}[ OK ] Verified:${C_RESET} ${C_WHITE}${t_name}${C_RESET} is active and verified."
+            echo -e "  ${C_DARK_G}└──${C_RESET} ${C_LIGHT_G}${C_BOLD}[ OK ] Verified:${C_RESET} ${C_WHITE}${t_name}${C_RESET} is active and verified."
             ((verified_count++))
         else
-            echo -e "  ${C_RED}${C_BOLD}[ FAILED ] Check Failed:${C_RESET} ${C_YELLOW}${t_name}${C_RESET} was not verified after setup."
+            echo -e "  ${C_DARK_G}└──${C_RESET} ${C_RED}${C_BOLD}[ FAILED ] Check Failed:${C_RESET} ${C_YELLOW}${t_name}${C_RESET} was not verified after setup."
             ((failed_count++))
         fi
     done
@@ -1221,12 +1429,10 @@ cli_install() {
     auto_stamp_desktop
 
     echo ""
-    echo -e "  ${C_GRAY}─────────────────────────────────────────────────────────────────${C_RESET}"
-    if [ "$failed_count" -eq 0 ] && [ "$verified_count" -gt 0 ]; then
-        echo -e "  ${C_LIGHT_G}${C_BOLD}[ SUCCESS ] All $verified_count selected tools verified successfully!${C_RESET}\n"
-    elif [ "$failed_count" -gt 0 ]; then
-        echo -e "  ${C_YELLOW}${C_BOLD}[ ATTENTION ] Completed with issues: $verified_count verified, $failed_count failed verification.${C_RESET}\n"
-    fi
+    echo -e "  ${C_DARK_G}┌─[ ${C_WHITE}${C_BOLD}PROVISIONING SUMMARY${C_RESET} ${C_DARK_G}]──────────────────────────────────────────┐${C_RESET}"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_LIGHT_G}%-41s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Successfully Provisioned" "$verified_count"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-26s${C_RESET} : ${C_RED}%-41s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "Failed / Issues" "$failed_count"
+    echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
 }
 
 cli_install_binary() {
@@ -1248,20 +1454,20 @@ cli_install_binary() {
     fi
     
     persist_env
-    echo -e "${C_LIGHT_G}${C_BOLD}[OK] 'ghost-stack' has been installed to $bin_target/ghost-stack${C_RESET}"
-    echo -e "You can now run ${C_WHITE}${C_BOLD}ghost-stack${C_RESET} directly from any terminal directory!"
+    echo -e "\n  ${C_LIGHT_G}${C_BOLD}[ OK ] 'ghost-stack' has been installed to $bin_target/ghost-stack${C_RESET}"
+    echo -e "  You can now run ${C_WHITE}${C_BOLD}ghost-stack${C_RESET} directly from any terminal directory!\n"
 }
 
 cli_doctor() {
     sync_env
-    draw_banner
-    echo -e "  ${C_WHITE}${C_BOLD}FLUTTER & ANDROID TOOLCHAIN DOCTOR${C_RESET}\n"
+    cli_header "FLUTTER & ANDROID TOOLCHAIN DOCTOR"
     if command -v flutter >/dev/null 2>&1; then
         flutter doctor -v
     elif [ -x "$FLUTTER_DIR/bin/flutter" ]; then
         "$FLUTTER_DIR/bin/flutter" doctor -v
     else
-        echo -e "${C_RED}Flutter binary not found. Install it via 'ghost-stack install android 9'.${C_RESET}"
+        echo -e "  ${C_RED}[MISSING] Flutter binary not found.${C_RESET}"
+        echo -e "  Install Flutter using: ${C_WHITE}ghost-stack install android 9${C_RESET}\n"
         exit 1
     fi
 }
@@ -1483,59 +1689,60 @@ handle_help_menu() {
 }
 
 cli_help() {
-    cat << EOF
-GHOST-STACK(1)                  User Commands                 GHOST-STACK(1)
+    local t_cols
+    t_cols=$(get_current_cols)
+    local cpu_speed mem_info
+    cpu_speed=$(get_cpu_speed)
+    mem_info=$(get_mem_info)
 
-NAME
-    ghost-stack - Modular Development Environment & Toolchain Orchestrator
-
-SYNOPSIS
-    ghost-stack [COMMAND] [OPTIONS]
-    ghost-stack                             (launches interactive TUI)
-
-COMMANDS
-    scan, -s [CATEGORY]
-        Perform diagnostic scan across all categories or a specified discipline.
-        Categories: android, ios, web, ai, tools, core
-
-    install, -i <CATEGORY> [TOOLS|all]
-        Perform direct headless installation of tools in a category.
-        Example: ghost-stack install web 1,3
-        Example: ghost-stack install ai all
-
-    doctor|-d|--doctor
-        Execute Flutter Doctor and Android toolchain verification.
-
-    clean, cleaner, cleanup
-        Launch Linux System Cleaner & Diagnostics suite (cache, logs, tmp, storage).
-
-    install-cli
-        Symlink ghost-stack into ~/.local/bin and stamp desktop launchers.
-
-    list, -l [CATEGORY]
-        Display all registered toolchains and their check functions.
-
-    help, -h, --help [TOPIC]
-        Display documentation topic (getting-started, commands, toolchains, troubleshooting).
-
-    --version, -v
-        Display ghost-stack version information.
-
-CATEGORIES
-    android     Java 21/17, cmdline-tools, platform-tools, SDK 34/36, build-tools, NDK, Gradle, Flutter, Scrcpy
-    ios         usbmuxd, libimobiledevice, ideviceinstaller, ifuse, libplist, CocoaPods, Fastlane
-    web         Node.js, pnpm, yarn, Bun, Deno, PostgreSQL, Redis, SQLite3, Docker, Nginx, Chrome
-    ai          Python3, pip, venv, Ollama, PyTorch, Scikit-Learn, Transformers, ChromaDB, JupyterLab, HF CLI
-    tools       VS Code, gh CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux & Htop
-    core        Git Config, SSH Key, C/C++ Essentials, Rust, Go, jq/ripgrep/fzf, Network Tools
-
-DOCUMENTATION DIRECTORY
-    See full styled guides in $ROOT_DIR/help/
-
-AUTHOR
-    Mwenda Boniface (https://github.com/Mwenda-Boniface)
-
+    echo -e "${C_LIGHT_G}${C_BOLD}"
+    if [ "$t_cols" -ge 65 ]; then
+        cat << "EOF"
+   ________               __       _____ __             __  
+  / ____/ /_  ____  _____/ /_     / ___// /_____ ______/ /__
+ / / __/ __ \/ __ \/ ___/ __/_____\__ \/ __/ __ `/ ___/ //_/
+/ /_/ / / / / /_/ (__  ) /_/_____/__/ / /_/ /_/ / /__/ ,<   
+\____/_/ /_/\____/____/\__/     /____/\__/\__,_/\___/_/|_|  
 EOF
+    else
+        echo "  [+] GHOST-STACK // CLI MANUAL [+]"
+    fi
+    echo -e "${C_RESET}"
+    echo -e "  ${C_WHITE}${C_BOLD}[+] GHOST-STACK // CLI ORCHESTRATION & AUTOMATION MANUAL [+]${C_RESET}\n"
+
+    echo -e "  ${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}USAGE SYNTAX${C_RESET} ${C_DARK_G}]────────────────────────────────────────────────────────┐${C_RESET}"
+    echo -e "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}ghost-stack [COMMAND] [OPTIONS]${C_RESET}    Headless automated CLI mode     ${C_DARK_G}│${C_RESET}"
+    echo -e "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}ghost-stack${C_RESET}                        Launch interactive cyberpunk TUI${C_DARK_G}│${C_RESET}"
+    echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+
+    echo -e "  ${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}CORE COMMANDS${C_RESET} ${C_DARK_G}]───────────────────────────────────────────────────────┐${C_RESET}"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "scan, -s [CATEGORY]" "Run system diagnostic scan"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "install, -i <CAT> [INDEX|all]" "Headless batch toolchain installer"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "doctor, -d" "Execute Flutter & Android SDK doctor"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "clean, cleaner, cleanup" "Run Linux System Cleaner & Diagnostics"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "desktop, app" "Generate Desktop App launcher & logo"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "install-cli" "Install binary into ~/.local/bin"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "list, -l [CATEGORY]" "List toolchains & installation status"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "help, -h [TOPIC]" "Display styled documentation topic"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-28s${C_RESET} ${C_MINT}%-45s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "--version, -v" "Display system version & architecture"
+    echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+
+    echo -e "  ${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}TOOLCHAIN CATEGORIES${C_RESET} ${C_DARK_G}]────────────────────────────────────────────────┐${C_RESET}"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-12s${C_RESET} ${C_GRAY}%-61s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "android" "Java 21/17, SDK 34/36, NDK, Gradle, Flutter SDK, Scrcpy"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-12s${C_RESET} ${C_GRAY}%-61s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "ios" "usbmuxd, libimobiledevice, ideviceinstaller, CocoaPods"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-12s${C_RESET} ${C_GRAY}%-61s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "web" "Node.js, Bun, Deno, PostgreSQL, Redis, Docker, Nginx, Chrome"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-12s${C_RESET} ${C_GRAY}%-61s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "ai" "Python3, pip, venv, Ollama, PyTorch, Scikit-Learn, JupyterLab"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-12s${C_RESET} ${C_GRAY}%-61s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "tools" "VS Code, gh CLI, Postman, Insomnia, DBeaver, Lazygit, Neovim"
+    printf "  ${C_DARK_G}│${C_RESET}  ${C_WHITE}%-12s${C_RESET} ${C_GRAY}%-61s${C_RESET} ${C_DARK_G}│${C_RESET}\n" "core" "Git Config, SSH Key, Build Essentials, Rust, Go, ripgrep, fzf"
+    echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+
+    echo -e "  ${C_DARK_G}┌─[ ${C_LIGHT_G}${C_BOLD}AUTOMATION WORKFLOW EXAMPLES${C_RESET} ${C_DARK_G}]────────────────────────────────────────┐${C_RESET}"
+    echo -e "  ${C_DARK_G}│${C_RESET}  ${C_MINT}ghost-stack scan web${C_RESET}                Verify web development toolchain   ${C_DARK_G}│${C_RESET}"
+    echo -e "  ${C_DARK_G}│${C_RESET}  ${C_MINT}ghost-stack install ai all${C_RESET}          Unattended setup of all AI tools   ${C_DARK_G}│${C_RESET}"
+    echo -e "  ${C_DARK_G}│${C_RESET}  ${C_MINT}ghost-stack install android 1,4,9${C_RESET}   Selective installation by index    ${C_DARK_G}│${C_RESET}"
+    echo -e "  ${C_DARK_G}│${C_RESET}  ${C_MINT}ghost-stack clean${C_RESET}                   Deep clean caches, logs & temp files${C_DARK_G}│${C_RESET}"
+    echo -e "  ${C_DARK_G}│${C_RESET}  ${C_MINT}ghost-stack desktop${C_RESET}                 Deploy desktop icon & custom logo  ${C_DARK_G}│${C_RESET}"
+    echo -e "  ${C_DARK_G}└────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
 }
 
 # ==============================================================================
@@ -1699,42 +1906,14 @@ trap 'on_winch_signal' WINCH
 
 render_home_dashboard() {
     local choice="$1"
-    local force_clear="$2"
-    
-    if [ "$force_clear" = true ]; then
-        clear
-    else
-        printf "\033[?25l\033[H"
-    fi
+    clear
 
     draw_banner --no-clear
     draw_home_telemetry
-    local t_cols t_lines
-    t_cols=$(get_current_cols)
-    t_lines=$(tput lines 2>/dev/null || echo 24)
 
-    if [ "$IS_TERMUX" = true ]; then
-        # Mobile layout (< 42 cols)
-        echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Android Development${C_RESET}"
-        echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}iOS Development (Linux Stack)${C_RESET}"
-        echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Web Development${C_RESET}"
-        echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}AI & Machine Learning${C_RESET}"
-        echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Development Softwares & IDEs${C_RESET}"
-        echo -e "  ${C_WHITE}[ 6 ]${C_RESET} ${C_LIGHT_G}Core System Tools & DevOps${C_RESET}"
-        echo -e "  ${C_WHITE}[ 7 ]${C_RESET} ${C_LIGHT_G}System Cleaner & Diagnostics${C_RESET}"
-        echo -e "  ${C_WHITE}[ 8 ]${C_RESET} ${C_LIGHT_G}Desktop App & Custom Logo${C_RESET}"
-        echo -e "  ${C_WHITE}[S]${C_RESET} ${C_LIGHT_G}Scan${C_RESET}  ${C_WHITE}[D]${C_RESET} ${C_LIGHT_G}Doc${C_RESET}  ${C_WHITE}[H]${C_RESET} ${C_LIGHT_G}Help${C_RESET}  ${C_WHITE}[0]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
-    else
-        # PC / Desktop Linux layout:
-        if [ "$t_lines" -lt 28 ] || [ "$t_cols" -lt 65 ]; then
-            # Compact PC Mode (Under 28 lines or under 65 cols):
-            # Uses compact grid so height NEVER exceeds 16 lines! No scrolling possible!
-            echo -e "  ${C_WHITE}[ 1 ]${C_RESET} Android   ${C_WHITE}[ 2 ]${C_RESET} iOS       ${C_WHITE}[ 3 ]${C_RESET} Web"
-            echo -e "  ${C_WHITE}[ 4 ]${C_RESET} AI/ML     ${C_WHITE}[ 5 ]${C_RESET} Softwares ${C_WHITE}[ 6 ]${C_RESET} DevOps"
-            echo -e "  ${C_WHITE}[ 7 ]${C_RESET} Cleaner   ${C_WHITE}[ 8 ]${C_RESET} Desktop App & Custom Logo"
-            echo -e "  ${C_WHITE}[ S ]${C_RESET} Scan  ${C_WHITE}[ D ]${C_RESET} Doctor  ${C_WHITE}[ H ]${C_RESET} Help  ${C_WHITE}[ R ]${C_RESET} Refresh  ${C_WHITE}[ 0 ]${C_RESET} Exit"
-        else
-            # Standard / Maximized PC Mode (>= 28 lines):
+    local tier="$G_LAYOUT_TIER"
+    case "$tier" in
+        mobile)
             echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Android Development${C_RESET}"
             echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}iOS Development (Linux Stack)${C_RESET}"
             echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Web Development${C_RESET}"
@@ -1742,17 +1921,81 @@ render_home_dashboard() {
             echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Development Softwares & IDEs${C_RESET}"
             echo -e "  ${C_WHITE}[ 6 ]${C_RESET} ${C_LIGHT_G}Core System Tools & DevOps${C_RESET}"
             echo -e "  ${C_WHITE}[ 7 ]${C_RESET} ${C_LIGHT_G}System Cleaner & Diagnostics${C_RESET}"
-            echo -e "  ${C_WHITE}[ 8 ]${C_RESET} ${C_LIGHT_G}Desktop Launcher & Custom Logo${C_RESET}"
-            echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_LIGHT_G}Full Diagnostic Scan${C_RESET}"
-            echo -e "  ${C_WHITE}[ D ]${C_RESET} ${C_LIGHT_G}Flutter & Android Doctor${C_RESET}"
-            echo -e "  ${C_WHITE}[ H ]${C_RESET} ${C_LIGHT_G}Help & Navigation Manual${C_RESET}"
-            echo -e "  ${C_WHITE}[ R ]${C_RESET} ${C_LIGHT_G}Refresh Screen${C_RESET}"
-            echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
-        fi
-    fi
+            echo -e "  ${C_WHITE}[ 8 ]${C_RESET} ${C_LIGHT_G}Desktop App & Custom Logo${C_RESET}"
+            echo -e "  ${C_WHITE}[S]${C_RESET} ${C_LIGHT_G}Scan${C_RESET}  ${C_WHITE}[D]${C_RESET} ${C_LIGHT_G}Doc${C_RESET}  ${C_WHITE}[H]${C_RESET} ${C_LIGHT_G}Help${C_RESET}  ${C_WHITE}[0]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
+            ;;
+        tall)
+            local t_lines
+            t_lines=$(get_current_lines)
+            if [ "$t_lines" -ge 32 ]; then
+                echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Android Development${C_RESET}"
+                echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}iOS Development (Linux Stack)${C_RESET}"
+                echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Web Development${C_RESET}"
+                echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}AI & Machine Learning${C_RESET}"
+                echo -e "  ${C_WHITE}[ 5 ]${C_RESET} ${C_LIGHT_G}Development Softwares & IDEs${C_RESET}"
+                echo -e "  ${C_WHITE}[ 6 ]${C_RESET} ${C_LIGHT_G}Core System Tools & DevOps${C_RESET}"
+                echo -e "  ${C_WHITE}[ 7 ]${C_RESET} ${C_LIGHT_G}System Cleaner & Diagnostics${C_RESET}"
+                echo -e "  ${C_WHITE}[ 8 ]${C_RESET} ${C_LIGHT_G}Desktop Launcher & Custom Logo${C_RESET}"
+                echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_LIGHT_G}Full Diagnostic Scan${C_RESET}"
+                echo -e "  ${C_WHITE}[ D ]${C_RESET} ${C_LIGHT_G}Flutter & Android Doctor${C_RESET}"
+                echo -e "  ${C_WHITE}[ H ]${C_RESET} ${C_LIGHT_G}Help & Navigation Manual${C_RESET}"
+                echo -e "  ${C_WHITE}[ R ]${C_RESET} ${C_LIGHT_G}Refresh Screen${C_RESET}"
+                echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
+            else
+                echo -e "  ${C_WHITE}[ 1 ]${C_RESET} Android   ${C_WHITE}[ 2 ]${C_RESET} iOS       ${C_WHITE}[ 3 ]${C_RESET} Web       ${C_WHITE}[ 4 ]${C_RESET} AI/ML"
+                echo -e "  ${C_WHITE}[ 5 ]${C_RESET} Softwares ${C_WHITE}[ 6 ]${C_RESET} DevOps    ${C_WHITE}[ 7 ]${C_RESET} Cleaner   ${C_WHITE}[ 8 ]${C_RESET} Desktop App"
+                echo -e "  ${C_WHITE}[ S ]${C_RESET} Scan  ${C_WHITE}[ D ]${C_RESET} Doctor  ${C_WHITE}[ H ]${C_RESET} Help  ${C_WHITE}[ R ]${C_RESET} Refresh  ${C_WHITE}[ 0 ]${C_RESET} Exit"
+            fi
+            ;;
+        medium)
+            echo -e "  ${C_WHITE}[ 1 ]${C_RESET} Android   ${C_WHITE}[ 2 ]${C_RESET} iOS       ${C_WHITE}[ 3 ]${C_RESET} Web       ${C_WHITE}[ 4 ]${C_RESET} AI/ML"
+            echo -e "  ${C_WHITE}[ 5 ]${C_RESET} Softwares ${C_WHITE}[ 6 ]${C_RESET} DevOps    ${C_WHITE}[ 7 ]${C_RESET} Cleaner   ${C_WHITE}[ 8 ]${C_RESET} Desktop App"
+            echo -e "  ${C_WHITE}[ S ]${C_RESET} Scan  ${C_WHITE}[ D ]${C_RESET} Doctor  ${C_WHITE}[ H ]${C_RESET} Help  ${C_WHITE}[ R ]${C_RESET} Refresh  ${C_WHITE}[ 0 ]${C_RESET} Exit"
+            ;;
+        compact)
+            echo -e "  ${C_WHITE}[1]${C_RESET}Android ${C_WHITE}[2]${C_RESET}iOS ${C_WHITE}[3]${C_RESET}Web ${C_WHITE}[4]${C_RESET}AI/ML ${C_WHITE}[5]${C_RESET}Tools ${C_WHITE}[6]${C_RESET}DevOps ${C_WHITE}[7]${C_RESET}Clean ${C_WHITE}[8]${C_RESET}App"
+            echo -e "  ${C_WHITE}[S]${C_RESET}Scan  ${C_WHITE}[D]${C_RESET}Doctor  ${C_WHITE}[H]${C_RESET}Help  ${C_WHITE}[R]${C_RESET}Refresh  ${C_WHITE}[0]${C_RESET}Exit"
+            ;;
+        tiny)
+            echo -e "  ${C_WHITE}[1-6]${C_RESET}Stacks  ${C_WHITE}[7]${C_RESET}Clean  ${C_WHITE}[8]${C_RESET}App  ${C_WHITE}[S]${C_RESET}Scan  ${C_WHITE}[D]${C_RESET}Doc  ${C_WHITE}[H]${C_RESET}Help  ${C_WHITE}[0]${C_RESET}Exit"
+            ;;
+    esac
+
     echo ""
     echo -ne "  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}${choice}\033[K"
     printf "\033[?25h"
+}
+
+update_telemetry_in_place() {
+    local new_cpu="$1"
+    local new_ram="$2"
+    if [ -n "$G_CPU_ROW" ] && [ "$G_CPU_ROW" -gt 0 ]; then
+        # Hide cursor and save cursor position (DEC + ANSI)
+        printf "\033[?25l\0337\033[s"
+
+        # Update CPU Speed
+        printf "\033[%d;%dH" "$G_CPU_ROW" "$G_CPU_COL"
+        local cpu_fmt="%-11s"
+        if [ "$G_LAYOUT_TIER" = "tall" ]; then cpu_fmt="%-14s"; fi
+        printf "${C_WHITE}${cpu_fmt}${C_RESET}" "$new_cpu"
+
+        # Update RAM
+        if [ -n "$G_RAM_ROW" ] && [ "$G_RAM_ROW" -gt 0 ]; then
+            printf "\033[%d;%dH" "$G_RAM_ROW" "$G_RAM_COL"
+            local ram_fmt="%-12s"
+            if [ "$G_LAYOUT_TIER" = "tall" ]; then ram_fmt="%-22s"; fi
+            if [ "$G_LAYOUT_TIER" = "mobile" ]; then ram_fmt="%-8.8s"; fi
+            local ram_display="$new_ram"
+            if [ "$G_LAYOUT_TIER" = "medium" ] || [ "$G_LAYOUT_TIER" = "compact" ] || [ "$G_LAYOUT_TIER" = "tiny" ]; then
+                ram_display=$(echo "$new_ram" | awk '{print $1 "/" $3}')
+                [ -z "$ram_display" ] && ram_display="4.8G/7.6G"
+            fi
+            printf "${C_WHITE}${ram_fmt}${C_RESET}" "$ram_display"
+        fi
+
+        # Restore cursor position and visibility
+        printf "\0338\033[u\033[?25h"
+    fi
 }
 
 tui_main() {
@@ -1763,7 +2006,7 @@ tui_main() {
 
     while true; do
         if [ "$need_clear" = true ] || [ "$G_WINCH_EVENT" = true ]; then
-            render_home_dashboard "$choice" true
+            render_home_dashboard "$choice"
             need_clear=false
             G_WINCH_EVENT=false
             last_cpu=$(get_cpu_speed)
@@ -1839,7 +2082,7 @@ tui_main() {
             if [ "$cur_cpu" != "$last_cpu" ] || [ "$cur_ram" != "$last_ram" ]; then
                 last_cpu="$cur_cpu"
                 last_ram="$cur_ram"
-                render_home_dashboard "$choice" false
+                update_telemetry_in_place "$cur_cpu" "$cur_ram"
             fi
         fi
     done
@@ -1870,7 +2113,7 @@ case "$1" in
         cli_install_binary
         ;;
     list|-l|--list)
-        cli_scan "$2"
+        cli_list "$2"
         ;;
     help|-h|--help)
         if [ -n "$2" ]; then
@@ -1887,7 +2130,7 @@ case "$1" in
         exit 0
         ;;
     --version|-v)
-        echo "ghost-stack version 3.1.0 ($ARCH-$OS_NAME)"
+        echo -e "  ${C_LIGHT_G}${C_BOLD}[+] GHOST-STACK // v3.1.0 (${ARCH} // ${OS_NAME}) [+]${C_RESET}"
         exit 0
         ;;
     "")
