@@ -80,18 +80,21 @@ Ghost-Stack features full native support for Android Termux:
 
 ---
 
-## 3. Aircrack-ng Style Telemetry Launch
+## 3. Dedicated Home Screen Telemetry Layout
 
-When launched, Ghost-Stack renders diagnostic telemetry before presenting its prompt:
+On the primary home screen (`tui_main`), Ghost-Stack renders an elegant, spacious diagnostic telemetry frame before presenting the discipline options:
+```text
+  ┌─[ SYSTEM ENVIRONMENT TELEMETRY ]──────────────────────────────────────┐
+  │
+  │   [*] Architecture     :  x86_64
+  │   [*] Operating System :  Kali GNU/Linux Rolling
+  │   [*] Active Session   :  bonnie
+  │   [*] Runtime Platform :  Native Linux (APT)
+  │   [*] Workspace Path   :  /home/bonnie/Desktop/setup-wizard
+  │
+  └──────────────────────────────────────────────────────────────────────────────┘
 ```
-  [+] GHOST-STACK v3.1.0 // Toolchain & Development Environment Orchestrator
-  [+] Code by Mwenda Boniface (https://github.com/Mwenda-Boniface)
-
-  [*] Architecture : x86_64        [*] Operating System : Kali GNU/Linux Rolling
-  [*] Session User : bonnie       [*] Runtime Platform : Native Linux (APT)
-  [*] Workspace    : /home/bonnie/Desktop/setup-wizard
-  ─────────────────────────────────────────────────────────────────
-```
+**Submenu Isolation:** When the user enters any submenu, discipline category, or help manual, this telemetry box is automatically hidden to keep navigation focused. It reappears only when returning to the main menu.
 The terminal prompt is dynamically scoped:
 - Main Menu: `ghost-stack > `
 - Discipline Submenu: `ghost-stack(android) > `, `ghost-stack(web) > `

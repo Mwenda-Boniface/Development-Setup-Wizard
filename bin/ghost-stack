@@ -157,7 +157,7 @@ auto_stamp_desktop() {
 auto_stamp_desktop
 
 # ==============================================================================
-# UI RENDERERS & TELEMETRY (AIRCRACK-NG STYLE PROBE BLOCK)
+# UI RENDERERS & TELEMETRY
 # ==============================================================================
 draw_banner() {
     clear
@@ -170,13 +170,26 @@ draw_banner() {
 \____/_/ /_/\____/____/\__/     /____/\__/\__,_/\___/_/|_|  
 EOF
     echo -e "${C_RESET}"
-    echo -e "  ${C_WHITE}${C_BOLD}[+] GHOST-STACK v3.1.0 // Toolchain & Development Environment Orchestrator${C_RESET}"
-    echo -e "  ${C_GRAY}[+] Code by Mwenda Boniface (https://github.com/Mwenda-Boniface)${C_RESET}"
-    echo ""
-    echo -e "  ${C_MINT}[*] Architecture :${C_RESET} ${C_WHITE}${ARCH}${C_RESET}        ${C_MINT}[*] Operating System :${C_RESET} ${C_WHITE}${OS_NAME}${C_RESET}"
-    echo -e "  ${C_MINT}[*] Session User :${C_RESET} ${C_WHITE}${CURRENT_USER}${C_RESET}       ${C_MINT}[*] Runtime Platform :${C_RESET} ${C_LIGHT_G}$([ "$IS_TERMUX" = true ] && echo "Android (Termux PKG)" || echo "Native Linux (APT)")${C_RESET}"
-    echo -e "  ${C_MINT}[*] Workspace    :${C_RESET} ${C_WHITE}${ROOT_DIR}${C_RESET}"
-    echo -e "  ${C_GRAY}─────────────────────────────────────────────────────────────────${C_RESET}"
+    echo -e "       ${C_WHITE}${C_BOLD}[ + ]   C O D E   B Y   M W E N D A   B O N I F A C E   [ + ]${C_RESET}\n"
+}
+
+draw_home_telemetry() {
+    local platform_label
+    if [ "$IS_TERMUX" = true ]; then
+        platform_label="Android (Termux PKG)"
+    else
+        platform_label="Native Linux (APT)"
+    fi
+
+    echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM ENVIRONMENT TELEMETRY${C_RESET} ${C_GRAY}]──────────────────────────────────────┐${C_RESET}"
+    echo -e "  ${C_GRAY}│${C_RESET}"
+    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Architecture     :${C_RESET}  ${C_WHITE}${ARCH}${C_RESET}"
+    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Operating System :${C_RESET}  ${C_WHITE}${OS_NAME}${C_RESET}"
+    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Active Session   :${C_RESET}  ${C_WHITE}${CURRENT_USER}${C_RESET}"
+    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Runtime Platform :${C_RESET}  ${C_LIGHT_G}${platform_label}${C_RESET}"
+    echo -e "  ${C_GRAY}│${C_RESET}   ${C_MINT}[*] Workspace Path   :${C_RESET}  ${C_WHITE}${ROOT_DIR}${C_RESET}"
+    echo -e "  ${C_GRAY}│${C_RESET}"
+    echo -e "  ${C_GRAY}└──────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
     echo ""
 }
 
@@ -1371,6 +1384,7 @@ handle_tui_category() {
 tui_main() {
     while true; do
         draw_banner
+        draw_home_telemetry
         echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Android Development${C_RESET}"
         echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}iOS Development (Linux Stack)${C_RESET}"
         echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Web Development${C_RESET}"
