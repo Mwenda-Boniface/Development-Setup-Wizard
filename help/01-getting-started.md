@@ -28,11 +28,23 @@ Or use the convenience root launcher:
 ```
 
 ### Method 3: Desktop Launcher (GUI Double-Click)
-Double-click the **Dev Environment Setup Wizard** icon on your Desktop or run:
+Double-click the **Ghost-Stack Dev Setup Wizard** icon on your Desktop or run:
 ```bash
 ./launch.sh
 ```
 `launch.sh` automatically detects your installed desktop terminal emulator (QTerminal, GNOME Terminal, or XFCE Terminal) and opens an interactive window.
+
+### Method 4: Android (Termux) Execution
+Ghost-Stack runs natively on Android via Termux without requiring root:
+```bash
+pkg update && pkg install -y git bash make
+git clone https://github.com/Mwenda-Boniface/Development-Setup-Wizard.git setup-wizard
+cd setup-wizard
+./run.sh
+# Or install globally into $PREFIX/bin:
+make install
+ghost-stack
+```
 
 ---
 
@@ -41,3 +53,11 @@ Double-click the **Dev Environment Setup Wizard** icon on your Desktop or run:
 - It discovers the current active user via `$(id -un)` and home via `$HOME`.
 - No paths are hardcoded to any specific developer account.
 - Desktop files and environment variable blocks (`~/.zshrc` and `~/.bashrc`) automatically adapt to whoever is logged in.
+
+---
+
+## Navigation Controls
+While viewing any section inside the Help Documentation:
+- `[ B ]`: Return to Help Menu
+- `[ M ]`: Jump directly to Main Menu
+- `[ 0 / Q ]`: Exit Ghost-Stack completely

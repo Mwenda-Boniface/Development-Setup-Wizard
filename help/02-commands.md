@@ -74,4 +74,14 @@ Runs `flutter doctor -v` and inspects Android SDK, Java 21, platform-tools, and 
 ```bash
 ghost-stack install-cli
 ```
-Installs a symlink to `~/.local/bin/ghost-stack`, re-signs the desktop launcher checksum for the current user, and ensures environment variables are exported in `~/.zshrc` and `~/.bashrc`.
+Installs a symlink to `~/.local/bin/ghost-stack` (or `$PREFIX/bin/ghost-stack` on Termux), re-signs the desktop launcher checksum for the current user, and ensures environment variables are exported in `~/.zshrc` and `~/.bashrc`.
+
+---
+
+### 6. In-Terminal Help Navigation Controls
+When viewing any documentation topic inside the interactive viewer:
+- `[ B ]`: Return to previous section (Help Index)
+- `[ M ]`: Return to Main Menu
+- `[ 0 / Q ]`: Exit Ghost-Stack completely
+Accepted commands: `b`, `back`, `m`, `main`, `0`, `q`, `exit`, `quit`.
+

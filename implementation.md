@@ -1,40 +1,41 @@
-# System Architecture & Implementation Specification: Dev-Wizard CLI
+# System Architecture & Implementation Specification: Ghost-Stack
 
-**System:** `dev-wizard` (Development Environment & Toolchain Orchestrator)  
-**Target Platform:** Linux (Debian, Ubuntu, Kali, Mint, Pop!_OS)  
+**System:** `Ghost-Stack` (Modular Development Environment & Toolchain Orchestrator)  
+**Target Platform:** Linux (Debian, Ubuntu, Kali, Mint, Pop!_OS) & Android (Termux)  
 **Shell Runtime:** POSIX Bash 4.4+  
-**Design Standard:** Minimalist Terminal / Emerald Green Monochrome Theme (Zero Emojis)  
-**User Resolution:** 100% Dynamic User & Multi-User Agnostic
+**Design Standard:** Minimalist Cyberpunk Terminal / Emerald Green Monochrome Theme (Zero Emojis)  
+**Launch Telemetry:** Aircrack-ng Style Initialization & Telemetry Header  
+**User Resolution:** 100% Dynamic User & Multi-User Agnostic (Linux & Termux)
 
 ---
 
-## 1. Architectural Overview & Dynamic User Isolation
+## 1. Architectural Overview & Platform Agnostic Design
 
-The system does not hardcode any user (`bonnie` or otherwise). All path resolutions, environment configurations, and desktop launcher executions dynamically inspect:
-- Current Runtime User: `CURRENT_USER="$(id -un)"`
-- Target Home Directory: `USER_HOME="${HOME:-/home/$CURRENT_USER}"`
-- Dynamic Desktop Launcher: Executed via POSIX shell variable expansion (`$HOME`) with runtime self-healing and checksum registration.
+Ghost-Stack dynamically adapts to both desktop Linux operating systems and Android devices running Termux. All path resolutions, environment configurations, and desktop launcher executions dynamically inspect the runtime environment without hardcoded usernames or fixed system paths.
 
 ```mermaid
 graph TD
-    subgraph User_Environment["Dynamic User Environment"]
-        Current_User["Runtime User ($USER / id -un)"]
-        User_Home["User Home Directory ($HOME)"]
+    subgraph Environment_Resolution["Runtime Environment Resolution"]
+        Host_Detect["Platform Probe (Linux vs Termux)"]
+        User_Detect["Dynamic User ($USER / id -un)"]
+        Home_Detect["Home Resolution ($HOME / Termux $PREFIX)"]
     end
 
-    subgraph Entry_Points["Execution Entry Points (User Agnostic)"]
-        CLI["Global Binary: $HOME/.local/bin/dev-wizard"]
-        DESKTOP["Desktop Launcher: $HOME/Desktop/Dev-Setup-Wizard.desktop"]
-        LAUNCHER["Wrapper Script: setup-wizard/launch.sh"]
+    subgraph Entry_Points["Execution Entry Points"]
+        CLI["Global Binary: ghost-stack (~/.local/bin or $PREFIX/bin)"]
+        DESKTOP["Desktop Launcher: Dev-Setup-Wizard.desktop"]
+        LAUNCHER["Wrapper Script: launch.sh"]
+        ROOT_RUN["Root Run Script: run.sh"]
         MAKE["Makefile (make install / make run)"]
     end
 
-    subgraph Engine_Core["dev-wizard Core Engine"]
-        UserResolver["Dynamic User & Permission Resolver"]
-        ArgParser["CLI Subcommand & Flag Parser"]
-        UITheme["Emerald Green Renderer (No Emojis)"]
-        StateMatrix["Detection & Check Matrix"]
-        ResolverEngine["Toolchain Resolvers (apt/git/pip/curl/sdk)"]
+    subgraph Engine_Core["Ghost-Stack Core Engine"]
+        Telemetry["Aircrack-ng Style Telemetry & Probe Header"]
+        ArgParser["Headless CLI & Flag Router"]
+        TUI["Interactive TUI Engine (Green Cyberpunk / Zero Emojis)"]
+        StateMatrix["Detection & Check Matrix (6 Disciplines)"]
+        HelpViewer["In-Terminal Styled Help Viewer (Return/Exit Controls)"]
+        ResolverEngine["Toolchain Resolvers (apt/pkg/git/pip/curl/sdk)"]
         EnvSync["Profile Injector (.zshrc & .bashrc)"]
     end
 
@@ -43,71 +44,96 @@ graph TD
         D_iOS["iOS: usbmuxd, libimobiledevice, ideviceinstaller, ifuse, plist-utils, CocoaPods, Fastlane"]
         D_Web["Web: Node.js, pnpm, yarn, Bun, Deno, PostgreSQL, Redis, SQLite3, Docker, Nginx, Chrome"]
         D_AI["AI/ML: Python3, pip, venv, Ollama, PyTorch, Scikit-Learn, Transformers, ChromaDB, JupyterLab, HF CLI"]
-        D_Tools["Tools: VS Code, gh CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux, Htop/Btop"]
+        D_Tools["Tools: VS Code/code-server, gh CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux, Htop"]
         D_Core["Core/DevOps: Git Identity, SSH Key (~/.ssh/id_ed25519), C/C++ Essentials, Rust, Go, jq, ripgrep, fzf, nmap"]
     end
 
-    User_Environment --> Entry_Points
-    Entry_Points --> UserResolver
-    UserResolver --> ArgParser
-    ArgParser --> StateMatrix
+    Environment_Resolution --> Entry_Points
+    Entry_Points --> Telemetry
+    Telemetry --> ArgParser
+    ArgParser --> TUI
+    TUI --> StateMatrix
     StateMatrix --> Disciplines
+    TUI --> HelpViewer
     ArgParser --> ResolverEngine
     ResolverEngine --> EnvSync
-    EnvSync --> User_Home
 ```
 
 ---
 
-## 2. Dynamic Desktop Launcher Architecture
+## 2. Termux on Android Compatibility Engine
 
-FreeDesktop specification forbids static environment variable expansion in `Exec=` fields unless wrapped by a shell. `Dev-Setup-Wizard.desktop` uses an intelligent dynamic shell wrapper:
-
-```ini
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Dev Environment Setup Wizard
-Comment=Modular Dev-Environment Toolchain Orchestrator
-Exec=bash -c 'U_HOME="$HOME"; [ -z "$U_HOME" ] && U_HOME="/home/$(id -un)"; LAUNCH="$U_HOME/Desktop/setup-wizard/launch.sh"; [ ! -f "$LAUNCH" ] && LAUNCH="$U_HOME/setup-wizard/launch.sh"; if [ -f "$LAUNCH" ]; then exec "$LAUNCH"; elif command -v dev-wizard >/dev/null 2>&1; then exec dev-wizard; else echo "Launcher not found in $U_HOME"; sleep 3; fi'
-Icon=utilities-terminal
-Terminal=false
-Categories=Development;
-StartupNotify=true
-```
-
-### Self-Healing & Automatic Checksum Registration
-Whenever `dev-wizard`, `make install`, or `launch.sh` executes:
-1. It queries `CURRENT_USER="$(id -un)"` and `CURRENT_HOME="$HOME"`.
-2. It generates the exact SHA-256 hash of the desktop file.
-3. It sets `metadata::xfce-exe-checksum` via `gio` for the active user, guaranteeing double-click execution without security warnings on XFCE/GNOME.
+Ghost-Stack features full native support for Android Termux:
+1. **Dynamic Platform Detection:**
+   ```bash
+   IS_TERMUX=false
+   if [ -n "$TERMUX_VERSION" ] || [ -d "/data/data/com.termux" ] || [[ "${PREFIX:-}" =~ "com.termux" ]]; then
+       IS_TERMUX=true
+   fi
+   ```
+2. **Rootless Package Management (`pkg_install`):**
+   Automatically falls back to `pkg install -y` or `apt-get install -y` without requesting `sudo`.
+3. **Dynamic Temporary Directory:**
+   Automatically redirects scratch extractions and downloads to `${PREFIX:-$HOME}/tmp` instead of `/tmp`.
+4. **Binary Target Resolution:**
+   Installs global binaries to `$PREFIX/bin` on Termux and `~/.local/bin` on Linux.
 
 ---
 
-## 3. Comprehensive Toolchain Matrix by Discipline
+## 3. Aircrack-ng Style Telemetry Launch
 
-### 01. Android Development
+When launched, Ghost-Stack renders diagnostic telemetry before presenting its prompt:
+```
+  [+] GHOST-STACK v3.1.0 // Toolchain & Development Environment Orchestrator
+  [+] Code by Mwenda Boniface (https://github.com/Mwenda-Boniface)
+
+  [*] Architecture : x86_64        [*] Operating System : Kali GNU/Linux Rolling
+  [*] Session User : bonnie       [*] Runtime Platform : Native Linux (APT)
+  [*] Workspace    : /home/bonnie/Desktop/setup-wizard
+  ─────────────────────────────────────────────────────────────────
+```
+The terminal prompt is dynamically scoped:
+- Main Menu: `ghost-stack > `
+- Discipline Submenu: `ghost-stack(android) > `, `ghost-stack(web) > `
+- Help Manual: `ghost-stack(help) > `
+
+---
+
+## 4. In-Terminal Help Navigation Engine
+
+The help viewer (`render_help_viewer`) presents a structured frame with multi-option navigation controls:
+- `[ B ] Return to Help Menu`: Returns to the main Help & Navigation manual.
+- `[ M ] Return to Main Menu`: Directly returns to the Ghost-Stack primary discipline selector.
+- `[ 0 / Q ] Exit Ghost-Stack`: Immediately terminates execution cleanly.
+
+Input parsing accepts keystrokes (`b`, `B`, `back`, `m`, `M`, `main`, `0`, `q`, `Q`, `exit`, `quit`).
+
+---
+
+## 5. Comprehensive Toolchain Matrix by Discipline
+
+### 01. Android Development (`android`)
 - **Java 21 LTS (`openjdk-21-jdk`)**: Primary modern Android runtime
 - **Java 17 LTS (`openjdk-17-jdk`)**: Compatible fallback runtime for legacy Gradle projects
 - **Android Command-Line Tools (`sdkmanager`)**: CLI SDK manager without Android Studio
 - **Android Platform-Tools (`adb`, `fastboot`)**: Debugger, device bridge, and bootloader tools
 - **Android SDK Platforms (API 34 & 36)**: Android 14 & 16 developer targets
-- **Android Build-Tools (28.0.3, 34.0.0, 35.0.0)**: Compilers, d8, apksigner, zipalign
+- **Android Build-Tools (28.0.3, 34.0.0)**: Compilers, d8, apksigner, zipalign
 - **Android NDK**: Native C/C++ development kit
 - **Gradle**: Native system build automation tool
 - **Flutter SDK (Stable Channel)**: Cross-platform client framework
-- **Scrcpy**: High-performance USB/wireless screen mirroring & device control
+- **Scrcpy**: High-performance USB screen mirroring & device control
 
-### 02. iOS Development (Linux Tools & Cross-Platform)
+### 02. iOS Development (`ios`)
 - **usbmuxd**: USB multiplexer daemon for iOS hardware connection
-- **libimobiledevice**: Native communication library and CLI (`ideviceinfo`, `ideviceenterrecovery`)
+- **libimobiledevice**: Native communication library and CLI (`ideviceinfo`)
 - **ideviceinstaller**: App management and IPA installation on attached iOS devices
 - **ifuse**: FUSE filesystem driver to mount iOS devices on Linux
 - **libplist-utils**: Property list converter (XML/binary plist conversion)
 - **CocoaPods & Ruby**: Dependency manager for cross-platform iOS projects
 - **Fastlane**: Continuous deployment & app store publishing automation
 
-### 03. Web Development
+### 03. Web Development (`web`)
 - **Node.js LTS & npm**: Standard JavaScript server runtime and package registry
 - **pnpm & yarn**: High-efficiency alternative package managers
 - **Bun**: Ultra-fast all-in-one JavaScript/TypeScript runtime & bundler
@@ -119,8 +145,8 @@ Whenever `dev-wizard`, `make install`, or `launch.sh` executes:
 - **Nginx**: High-performance web server, reverse proxy, and SSL terminator
 - **Chromium / Google Chrome**: Headless browser automation and web development
 
-### 04. AI & Machine Learning Development
-- **Python 3, pip, venv & python3-dev**: Python base development environment
+### 04. AI & Machine Learning Development (`ai`)
+- **Python 3, pip, venv & dev**: Python base development environment
 - **Ollama**: Local LLM runner (Llama 3, DeepSeek, Gemma, Mistral)
 - **Core AI Stack**: NumPy, Pandas, SciPy, Matplotlib, Seaborn
 - **Deep Learning Framework**: PyTorch, Torchvision, Torchaudio
@@ -130,8 +156,8 @@ Whenever `dev-wizard`, `make install`, or `launch.sh` executes:
 - **JupyterLab & Notebook**: Interactive web browser data science IDE
 - **Hugging Face Hub CLI**: Model and dataset download utility
 
-### 05. Development Softwares & IDEs
-- **Visual Studio Code (VS Code)**: Flagship extensible code editor
+### 05. Development Softwares & IDEs (`tools`)
+- **Visual Studio Code (VS Code / Code-Server)**: Flagship extensible code editor
 - **GitHub CLI (`gh`)**: Official command-line tool for GitHub issues, PRs, and repos
 - **Postman**: Comprehensive API design, mock, and testing platform
 - **Insomnia**: Fast REST and GraphQL testing client
@@ -141,10 +167,10 @@ Whenever `dev-wizard`, `make install`, or `launch.sh` executes:
 - **Neovim**: High-performance extensible terminal editor
 - **Tmux & Htop / Btop**: Terminal multiplexer and modern system activity monitors
 
-### 06. Core System Tools & DevOps / Security
+### 06. Core System Tools & DevOps (`core`)
 - **Git CLI & Global Identity**: `user.name`, `user.email`, `init.defaultBranch main`
 - **GitHub SSH Key**: Ed25519 authentication with automatic public key deployment test
-- **C/C++ Build Essentials**: `gcc`, `g++`, `clang`, `cmake`, `ninja-build`, `pkg-config`, `libgtk-3-dev`
+- **C/C++ Build Essentials**: `gcc`, `g++`, `clang`, `cmake`, `ninja-build`, `pkg-config`
 - **Rust Toolchain**: `rustup`, `rustc`, `cargo`
 - **Go Programming Language**: `golang-go` runtime and compiler
 - **Modern CLI Utilities**: `curl`, `wget`, `jq`, `ripgrep`, `fzf`
@@ -152,28 +178,28 @@ Whenever `dev-wizard`, `make install`, or `launch.sh` executes:
 
 ---
 
-## 4. CLI Command Reference for Power Users
+## 6. CLI Command Reference for Tech Gurus
 
 ```bash
-# Global installation for any user:
+# Global installation:
 cd setup-wizard
 make install
 
 # Diagnostic Commands:
-dev-wizard scan            # Full multi-category scan
-dev-wizard scan android    # Check Android & Flutter stack
-dev-wizard scan web        # Check Web stack
-dev-wizard scan ai         # Check AI & Machine Learning stack
-dev-wizard scan tools      # Check IDEs & Dev Softwares
-dev-wizard scan core       # Check Core DevOps, Rust, Go, Git
+ghost-stack scan            # Full multi-category scan
+ghost-stack scan android    # Check Android & Flutter stack
+ghost-stack scan web        # Check Web stack
+ghost-stack scan ai         # Check AI & Machine Learning stack
+ghost-stack scan tools      # Check IDEs & Dev Softwares
+ghost-stack scan core       # Check Core DevOps, Rust, Go, Git
 
 # Headless Selective Provisioning:
-dev-wizard install web 1,3,4   # Install specific uninstalled tools
-dev-wizard install ai all      # Provision complete AI/ML stack
-dev-wizard install android all # Provision complete Android CLI stack
+ghost-stack install web 1,3,4   # Install specific uninstalled tools
+ghost-stack install ai all      # Provision complete AI/ML stack
+ghost-stack install android all # Provision complete Android CLI stack
 
 # System Diagnostics:
-dev-wizard doctor          # Flutter Doctor & Android toolchain verification
-dev-wizard --version       # Print version
-dev-wizard --help          # Print comprehensive manual
+ghost-stack doctor          # Flutter Doctor & Android toolchain verification
+ghost-stack --version       # Print version and system telemetry
+ghost-stack --help          # Print comprehensive manual
 ```
