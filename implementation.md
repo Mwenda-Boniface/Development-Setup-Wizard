@@ -3,157 +3,177 @@
 **System:** `dev-wizard` (Development Environment & Toolchain Orchestrator)  
 **Target Platform:** Linux (Debian, Ubuntu, Kali, Mint, Pop!_OS)  
 **Shell Runtime:** POSIX Bash 4.4+  
-**Design Standard:** Minimalist Terminal / Emerald Green Monochrome Theme (Zero Emojis)
+**Design Standard:** Minimalist Terminal / Emerald Green Monochrome Theme (Zero Emojis)  
+**User Resolution:** 100% Dynamic User & Multi-User Agnostic
 
 ---
 
-## 1. Architectural Overview
+## 1. Architectural Overview & Dynamic User Isolation
 
-The `dev-wizard` system is designed as an agentic, modular toolchain manager providing dual-mode execution:
-1. **Interactive TUI (Terminal User Interface):** Menu-driven, scanner-guided, selective installer.
-2. **Headless CLI Command Interface:** Direct flag-based execution tailored for DevOps engineers and command-line power users (`tech gurus`).
+The system does not hardcode any user (`bonnie` or otherwise). All path resolutions, environment configurations, and desktop launcher executions dynamically inspect:
+- Current Runtime User: `CURRENT_USER="$(id -un)"`
+- Target Home Directory: `USER_HOME="${HOME:-/home/$CURRENT_USER}"`
+- Dynamic Desktop Launcher: Executed via POSIX shell variable expansion (`$HOME`) with runtime self-healing and checksum registration.
 
 ```mermaid
 graph TD
-    subgraph Execution_Entry["Execution Entry Points"]
-        CLI["CLI Command (dev-wizard [args])"]
-        TUI["Interactive Mode (dev-wizard / Desktop Shortcut)"]
+    subgraph User_Environment["Dynamic User Environment"]
+        Current_User["Runtime User ($USER / id -un)"]
+        User_Home["User Home Directory ($HOME)"]
+    end
+
+    subgraph Entry_Points["Execution Entry Points (User Agnostic)"]
+        CLI["Global Binary: $HOME/.local/bin/dev-wizard"]
+        DESKTOP["Desktop Launcher: $HOME/Desktop/Dev-Setup-Wizard.desktop"]
+        LAUNCHER["Wrapper Script: setup-wizard/launch.sh"]
         MAKE["Makefile (make install / make run)"]
     end
 
-    subgraph Core_Engine["dev-wizard Core Engine"]
-        ArgParser["CLI Argument & Flag Parser"]
-        UITheme["UI & Terminal Renderer (Emerald Green / Unicode)"]
-        Scanner["Diagnostic & State Detection Matrix"]
-        Installer["Package & Toolchain Resolver"]
-        EnvSync["Profile & Shell State Synchronizer"]
+    subgraph Engine_Core["dev-wizard Core Engine"]
+        UserResolver["Dynamic User & Permission Resolver"]
+        ArgParser["CLI Subcommand & Flag Parser"]
+        UITheme["Emerald Green Renderer (No Emojis)"]
+        StateMatrix["Detection & Check Matrix"]
+        ResolverEngine["Toolchain Resolvers (apt/git/pip/curl/sdk)"]
+        EnvSync["Profile Injector (.zshrc & .bashrc)"]
     end
 
-    subgraph Domain_Categories["Toolchain Domain Modules"]
-        M_Android["android: Java 21, cmdline-tools, adb, platforms, Flutter"]
-        M_iOS["ios: usbmuxd, libimobiledevice, ideviceinstaller, CocoaPods"]
-        M_Web["web: Node.js, pnpm, yarn, PostgreSQL, Redis, Docker, Chrome"]
-        M_AI["ai: Python3, venv, Ollama, PyTorch, JupyterLab, Hugging Face"]
-        M_Tools["tools: VS Code, gh CLI, Postman, DBeaver, Git-Cola, Tmux"]
-        M_Core["core: Git Config, SSH Key (~/.ssh/id_ed25519), C/C++ Essentials"]
+    subgraph Disciplines["Extended Toolchain Disciplines"]
+        D_Android["Android: Java 21, Java 17, cmdline-tools, adb, platforms 34/36, build-tools, NDK, Gradle, Flutter, Scrcpy"]
+        D_iOS["iOS: usbmuxd, libimobiledevice, ideviceinstaller, ifuse, plist-utils, CocoaPods, Fastlane"]
+        D_Web["Web: Node.js, pnpm, yarn, Bun, Deno, PostgreSQL, Redis, SQLite3, Docker, Nginx, Chrome"]
+        D_AI["AI/ML: Python3, pip, venv, Ollama, PyTorch, Scikit-Learn, Transformers, ChromaDB, JupyterLab, HF CLI"]
+        D_Tools["Tools: VS Code, gh CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux, Htop/Btop"]
+        D_Core["Core/DevOps: Git Identity, SSH Key (~/.ssh/id_ed25519), C/C++ Essentials, Rust, Go, jq, ripgrep, fzf, nmap"]
     end
 
-    subgraph Persistence["Persistence & Environment Targets"]
-        ZSH["~/.zshrc"]
-        BASH["~/.bashrc"]
-        BIN["~/.local/bin/dev-wizard"]
-        DESKTOP["~/.local/share/applications/"]
-    end
-
-    CLI --> ArgParser
-    TUI --> ArgParser
-    MAKE --> ArgParser
-
-    ArgParser --> Scanner
-    ArgParser --> Installer
-    ArgParser --> UITheme
-
-    Scanner --> Domain_Categories
-    Installer --> Domain_Categories
-
-    Installer --> EnvSync
-    EnvSync --> ZSH
-    EnvSync --> BASH
-    Installer --> BIN
-    Installer --> DESKTOP
+    User_Environment --> Entry_Points
+    Entry_Points --> UserResolver
+    UserResolver --> ArgParser
+    ArgParser --> StateMatrix
+    StateMatrix --> Disciplines
+    ArgParser --> ResolverEngine
+    ResolverEngine --> EnvSync
+    EnvSync --> User_Home
 ```
 
 ---
 
-## 2. CLI Command Interface for Tech Gurus
+## 2. Dynamic Desktop Launcher Architecture
 
-After cloning the repository, tech users can either run the binary directly or install it globally into their system `PATH`:
+FreeDesktop specification forbids static environment variable expansion in `Exec=` fields unless wrapped by a shell. `Dev-Setup-Wizard.desktop` uses an intelligent dynamic shell wrapper:
+
+```ini
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Dev Environment Setup Wizard
+Comment=Modular Dev-Environment Toolchain Orchestrator
+Exec=bash -c 'U_HOME="$HOME"; [ -z "$U_HOME" ] && U_HOME="/home/$(id -un)"; LAUNCH="$U_HOME/Desktop/setup-wizard/launch.sh"; [ ! -f "$LAUNCH" ] && LAUNCH="$U_HOME/setup-wizard/launch.sh"; if [ -f "$LAUNCH" ]; then exec "$LAUNCH"; elif command -v dev-wizard >/dev/null 2>&1; then exec dev-wizard; else echo "Launcher not found in $U_HOME"; sleep 3; fi'
+Icon=utilities-terminal
+Terminal=false
+Categories=Development;
+StartupNotify=true
+```
+
+### Self-Healing & Automatic Checksum Registration
+Whenever `dev-wizard`, `make install`, or `launch.sh` executes:
+1. It queries `CURRENT_USER="$(id -un)"` and `CURRENT_HOME="$HOME"`.
+2. It generates the exact SHA-256 hash of the desktop file.
+3. It sets `metadata::xfce-exe-checksum` via `gio` for the active user, guaranteeing double-click execution without security warnings on XFCE/GNOME.
+
+---
+
+## 3. Comprehensive Toolchain Matrix by Discipline
+
+### 01. Android Development
+- **Java 21 LTS (`openjdk-21-jdk`)**: Primary modern Android runtime
+- **Java 17 LTS (`openjdk-17-jdk`)**: Compatible fallback runtime for legacy Gradle projects
+- **Android Command-Line Tools (`sdkmanager`)**: CLI SDK manager without Android Studio
+- **Android Platform-Tools (`adb`, `fastboot`)**: Debugger, device bridge, and bootloader tools
+- **Android SDK Platforms (API 34 & 36)**: Android 14 & 16 developer targets
+- **Android Build-Tools (28.0.3, 34.0.0, 35.0.0)**: Compilers, d8, apksigner, zipalign
+- **Android NDK**: Native C/C++ development kit
+- **Gradle**: Native system build automation tool
+- **Flutter SDK (Stable Channel)**: Cross-platform client framework
+- **Scrcpy**: High-performance USB/wireless screen mirroring & device control
+
+### 02. iOS Development (Linux Tools & Cross-Platform)
+- **usbmuxd**: USB multiplexer daemon for iOS hardware connection
+- **libimobiledevice**: Native communication library and CLI (`ideviceinfo`, `ideviceenterrecovery`)
+- **ideviceinstaller**: App management and IPA installation on attached iOS devices
+- **ifuse**: FUSE filesystem driver to mount iOS devices on Linux
+- **libplist-utils**: Property list converter (XML/binary plist conversion)
+- **CocoaPods & Ruby**: Dependency manager for cross-platform iOS projects
+- **Fastlane**: Continuous deployment & app store publishing automation
+
+### 03. Web Development
+- **Node.js LTS & npm**: Standard JavaScript server runtime and package registry
+- **pnpm & yarn**: High-efficiency alternative package managers
+- **Bun**: Ultra-fast all-in-one JavaScript/TypeScript runtime & bundler
+- **Deno**: Modern secure runtime for TypeScript and JavaScript
+- **PostgreSQL**: Production-grade relational database server and `psql` client
+- **Redis**: High-throughput in-memory key-value database & caching engine
+- **SQLite3**: Embedded SQL database engine and development libraries
+- **Docker Engine & Docker Compose**: Containerized application virtualization
+- **Nginx**: High-performance web server, reverse proxy, and SSL terminator
+- **Chromium / Google Chrome**: Headless browser automation and web development
+
+### 04. AI & Machine Learning Development
+- **Python 3, pip, venv & python3-dev**: Python base development environment
+- **Ollama**: Local LLM runner (Llama 3, DeepSeek, Gemma, Mistral)
+- **Core AI Stack**: NumPy, Pandas, SciPy, Matplotlib, Seaborn
+- **Deep Learning Framework**: PyTorch, Torchvision, Torchaudio
+- **Machine Learning Suite**: Scikit-Learn, XGBoost, LightGBM
+- **NLP & Transformers Stack**: Hugging Face Transformers, Datasets, Tokenizers, Accelerate
+- **Vector Database & Embeddings**: ChromaDB, Sentence-Transformers
+- **JupyterLab & Notebook**: Interactive web browser data science IDE
+- **Hugging Face Hub CLI**: Model and dataset download utility
+
+### 05. Development Softwares & IDEs
+- **Visual Studio Code (VS Code)**: Flagship extensible code editor
+- **GitHub CLI (`gh`)**: Official command-line tool for GitHub issues, PRs, and repos
+- **Postman**: Comprehensive API design, mock, and testing platform
+- **Insomnia**: Fast REST and GraphQL testing client
+- **DBeaver Community**: Multi-platform database management GUI
+- **Lazygit**: High-speed terminal UI for Git operations
+- **Git GUI Tools (Git Cola, Gitk)**: Visual branch visualizers
+- **Neovim**: High-performance extensible terminal editor
+- **Tmux & Htop / Btop**: Terminal multiplexer and modern system activity monitors
+
+### 06. Core System Tools & DevOps / Security
+- **Git CLI & Global Identity**: `user.name`, `user.email`, `init.defaultBranch main`
+- **GitHub SSH Key**: Ed25519 authentication with automatic public key deployment test
+- **C/C++ Build Essentials**: `gcc`, `g++`, `clang`, `cmake`, `ninja-build`, `pkg-config`, `libgtk-3-dev`
+- **Rust Toolchain**: `rustup`, `rustc`, `cargo`
+- **Go Programming Language**: `golang-go` runtime and compiler
+- **Modern CLI Utilities**: `curl`, `wget`, `jq`, `ripgrep`, `fzf`
+- **Network Diagnostic Utilities**: `nmap`, `netcat`, `tcpdump`
+
+---
+
+## 4. CLI Command Reference for Power Users
 
 ```bash
-# Direct execution from cloned directory:
-./bin/dev-wizard [command] [options]
-
-# Or install globally into ~/.local/bin:
+# Global installation for any user:
+cd setup-wizard
 make install
-# Now available system-wide:
-dev-wizard [command] [options]
+
+# Diagnostic Commands:
+dev-wizard scan            # Full multi-category scan
+dev-wizard scan android    # Check Android & Flutter stack
+dev-wizard scan web        # Check Web stack
+dev-wizard scan ai         # Check AI & Machine Learning stack
+dev-wizard scan tools      # Check IDEs & Dev Softwares
+dev-wizard scan core       # Check Core DevOps, Rust, Go, Git
+
+# Headless Selective Provisioning:
+dev-wizard install web 1,3,4   # Install specific uninstalled tools
+dev-wizard install ai all      # Provision complete AI/ML stack
+dev-wizard install android all # Provision complete Android CLI stack
+
+# System Diagnostics:
+dev-wizard doctor          # Flutter Doctor & Android toolchain verification
+dev-wizard --version       # Print version
+dev-wizard --help          # Print comprehensive manual
 ```
-
-### Supported Subcommands & Flags
-
-| Command / Flag | Arguments | Description |
-|---|---|---|
-| `dev-wizard` | *(none)* | Launches the full interactive Terminal UI |
-| `dev-wizard scan` or `-s` | `[category]` | Runs diagnostic check across all categories or a specified category (`android`, `ios`, `web`, `ai`, `tools`, `core`) |
-| `dev-wizard install` or `-i` | `<category> [tools]` | Headless batch installation. Accepts category name and comma-separated indices or `all` (e.g., `dev-wizard install web 1,3` or `dev-wizard install android all`) |
-| `dev-wizard doctor` or `-d` | *(none)* | Executes Flutter Doctor and Android toolchain verification |
-| `dev-wizard list` or `-l` | `[category]` | Lists supported tools and their current installation status |
-| `dev-wizard install-cli` | *(none)* | Symlinks `dev-wizard` into `~/.local/bin` and updates shell environment |
-| `dev-wizard --help` or `-h` | *(none)* | Displays comprehensive CLI usage manual |
-| `dev-wizard --version` or `-v`| *(none)* | Prints release version and build info |
-
-### CLI Example Invocations for Power Users
-
-```bash
-# 1. Quick diagnostic of current system without entering interactive menu
-dev-wizard scan
-
-# 2. Inspect specific development discipline
-dev-wizard scan web
-dev-wizard scan ai
-
-# 3. Headless installation of specific tools in a category
-dev-wizard install web 1,4,5
-dev-wizard install ai all
-
-# 4. Global system registration
-make install
-dev-wizard --version
-```
-
----
-
-## 3. UI Styling & Visual Aesthetics Standard
-
-To meet professional engineering standards, all graphical emojis (🤖, 🍎, 🌐, etc.) are strictly prohibited. The interface utilizes a high-contrast **Terminal Emerald Green** color standard combined with Unicode box-drawing characters:
-
-### Color Palette Specification
-- **Primary Accent (Emerald Glow):** `\033[38;5;48m` (Bright spring/emerald green)
-- **Secondary Accent (Mint Green):** `\033[38;5;84m` (Crisp readable terminal green)
-- **Status Success (`[ OK ]`):** `\033[1;32m` (Standard bold green)
-- **Status Missing (`[ MISSING ]`):** `\033[1;31m` (Standard bold red)
-- **Status Attention (`[ ATTN ]`):** `\033[1;33m` (Amber yellow)
-- **Borders & Dividers:** `\033[38;5;28m` (Muted dark forest green)
-- **Labels & Numbers:** `\033[1;37m` (Bold white)
-- **Subtext & Paths:** `\033[38;5;245m` (Slate gray)
-
-### Unicode Glyph Mapping (No Emojis)
-- Section Indicators: `▶` or `◆`
-- Success Mark: `✓`
-- Failure Mark: `✗`
-- Warning Mark: `▲`
-- List Bullets: `●`
-- Frame Borders: `╔═╗`, `║ ║`, `╚═╝`, `┌─┐`, `│ │`, `└─┘`, `╠═╣`
-
----
-
-## 4. Modular Directory Layout
-
-```text
-setup-wizard/
-├── bin/
-│   └── dev-wizard            # Main CLI & TUI executable engine
-├── implementation.md         # This technical specification
-├── Makefile                  # Build, install, and uninstall automation
-├── README.md                 # Public documentation and usage guide
-├── launch.sh                 # Native GUI terminal wrapper for QTerminal/Gnome
-└── Dev-Setup-Wizard.desktop  # FreeDesktop launcher (with XFCE trusted checksum)
-```
-
----
-
-## 5. Security & Idempotency Rules
-
-1. **Non-Destructive Execution:** Tool checks verify existence before attempting writes. Never overwrite existing valid user configurations (`.gitconfig`, SSH keys, etc.).
-2. **Path Deduplication:** Shell profile injector validates `~/.zshrc` and `~/.bashrc` before appending PATH blocks.
-3. **Privilege Separation:** System package manager operations explicitly request `sudo` only when invoking `apt` or system-level daemons. User-space tools (Flutter, pip, local npm) install into `$HOME`.

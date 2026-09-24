@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# DEV-WIZARD CLI & TUI TOOLCHAIN ORCHESTRATOR
-# Version: 2.1.0
+# DEV-WIZARD // SYSTEM & TOOLCHAIN ORCHESTRATOR
+# Version: 2.2.0
 # License: MIT
 # Platform: Linux (Debian, Ubuntu, Kali, Mint, Pop!_OS)
 # Style: Minimalist Terminal Emerald Green (Strictly Zero Emojis)
+# Architecture: 100% Dynamic User & Multi-User Agnostic
 # ==============================================================================
 
 set -o pipefail
@@ -14,16 +15,32 @@ if [ -z "$BASH_VERSION" ]; then
     exec bash "$0" "$@"
 fi
 
-# Core Paths
+# ==============================================================================
+# DYNAMIC USER RESOLUTION
+# ==============================================================================
+CURRENT_USER="$(id -un 2>/dev/null || whoami)"
+CURRENT_HOME="${HOME:-/home/$CURRENT_USER}"
+
 REAL_SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 ROOT_DIR="$(cd "$(dirname "$REAL_SCRIPT_PATH")/.." && pwd)"
-DEV_DIR="$HOME/development"
+
+DEV_DIR="$CURRENT_HOME/development"
 FLUTTER_DIR="$DEV_DIR/flutter"
-ANDROID_DIR="$HOME/Android/Sdk"
-JAVA_PREFERRED_PATH="/usr/lib/jvm/java-21-openjdk-amd64"
+ANDROID_DIR="$CURRENT_HOME/Android/Sdk"
+JAVA_21_PATH="/usr/lib/jvm/java-21-openjdk-amd64"
+JAVA_17_PATH="/usr/lib/jvm/java-17-openjdk-amd64"
+
+# Preferred default Java
+if [ -d "$JAVA_21_PATH" ]; then
+    JAVA_PREFERRED_PATH="$JAVA_21_PATH"
+elif [ -d "$JAVA_17_PATH" ]; then
+    JAVA_PREFERRED_PATH="$JAVA_17_PATH"
+else
+    JAVA_PREFERRED_PATH="/usr/lib/jvm/default-java"
+fi
 
 # ==============================================================================
-# COLOR PALETTE (EMERALD GREEN THEME)
+# COLOR PALETTE (EMERALD GREEN THEME - ZERO EMOJIS)
 # ==============================================================================
 C_EMERALD="\033[38;5;48m"   # Bright glowing emerald
 C_MINT="\033[38;5;84m"      # Crisp readable mint green
@@ -44,26 +61,26 @@ badge_warn()    { echo -e "  ${C_YELLOW}${C_BOLD}[ WARN ]${C_RESET}     $1"; }
 badge_info()    { echo -e "  ${C_MINT}${C_BOLD}[ INFO ]${C_RESET}     $1"; }
 
 # ==============================================================================
-# ENVIRONMENT SYNCHRONIZATION
+# ENVIRONMENT & DESKTOP AUTO-STAMPING
 # ==============================================================================
 sync_env() {
     if [ -d "$JAVA_PREFERRED_PATH" ]; then
         export JAVA_HOME="$JAVA_PREFERRED_PATH"
     fi
     export ANDROID_HOME="$ANDROID_DIR"
-    export PATH="$HOME/.local/bin:$FLUTTER_DIR/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:${JAVA_HOME:-/usr}/bin:$PATH"
+    export PATH="$CURRENT_HOME/.local/bin:$CURRENT_HOME/.cargo/bin:$CURRENT_HOME/go/bin:$CURRENT_HOME/.bun/bin:$CURRENT_HOME/.deno/bin:$FLUTTER_DIR/bin:$ANDROID_DIR/cmdline-tools/latest/bin:$ANDROID_DIR/platform-tools:${JAVA_HOME:-/usr}/bin:$PATH"
 }
 sync_env
 
 persist_env() {
     local env_block="
-# --- DEV-WIZARD ENVIRONMENT PATHS ---
+# --- DEV-WIZARD ENVIRONMENT PATHS (USER: $CURRENT_USER) ---
 export JAVA_HOME=\"${JAVA_PREFERRED_PATH}\"
 export ANDROID_HOME=\"\$HOME/Android/Sdk\"
-export PATH=\"\$HOME/.local/bin:\$HOME/development/flutter/bin:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$JAVA_HOME/bin:\$PATH\"
-# ------------------------------------"
+export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$HOME/go/bin:\$HOME/.bun/bin:\$HOME/.deno/bin:\$HOME/development/flutter/bin:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$JAVA_HOME/bin:\$PATH\"
+# ---------------------------------------------------------"
 
-    for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    for rc in "$CURRENT_HOME/.zshrc" "$CURRENT_HOME/.bashrc"; do
         if [ -f "$rc" ]; then
             if ! grep -q "DEV-WIZARD ENVIRONMENT PATHS" "$rc" && ! grep -q "ANDROID_HOME" "$rc"; then
                 echo "$env_block" >> "$rc"
@@ -73,15 +90,33 @@ export PATH=\"\$HOME/.local/bin:\$HOME/development/flutter/bin:\$ANDROID_HOME/cm
 }
 persist_env
 
-# ==============================================================================
-# UI RENDERERS
-# ==============================================================================
+# Auto-stamp desktop file security checksum for whichever user is active
+auto_stamp_desktop() {
+    local desktop_targets=(
+        "$CURRENT_HOME/Desktop/Dev-Setup-Wizard.desktop"
+        "$ROOT_DIR/Dev-Setup-Wizard.desktop"
+        "$CURRENT_HOME/.local/share/applications/dev-setup-wizard.desktop"
+    )
+    for dt in "${desktop_targets[@]}"; do
+        if [ -f "$dt" ] && command -v gio >/dev/null 2>&1; then
+            chmod +x "$dt" 2>/dev/null || true
+            local sum
+            sum=$(sha256sum "$dt" 2>/dev/null | awk '{print $1}')
+            if [ -n "$sum" ]; then
+                gio set -t string "$dt" metadata::xfce-exe-checksum "$sum" 2>/dev/null || true
+            fi
+        fi
+    done
+}
+auto_stamp_desktop
+
 draw_banner() {
     clear
-    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}DEV-WIZARD // SYSTEM & TOOLCHAIN ORCHESTRATOR${C_RESET}                ${C_DARK_G}v2.1.0${C_RESET}  ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_GRAY}Modular Environment Provisioning, State Diagnostics & Package Matrix${C_RESET}     ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}DEV-WIZARD // SYSTEM & TOOLCHAIN ORCHESTRATOR${C_RESET}                        ${C_DARK_G}v2.2.0${C_RESET}  ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_GRAY}Active Executor:${C_RESET} ${C_WHITE}${CURRENT_USER}${C_RESET} ${C_GRAY}(${CURRENT_HOME})${C_RESET}                                              ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_GRAY}Modular Environment Provisioning, State Diagnostics & Package Matrix${C_RESET}             ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
     echo ""
 }
 
@@ -95,19 +130,22 @@ pause() {
 # TOOL IMPLEMENTATIONS (CHECKS & INSTALLERS)
 # ==============================================================================
 
-# --- [ANDROID] ---
-check_java21() {
-    [ -d "$JAVA_PREFERRED_PATH" ] || (command -v java >/dev/null && java -version 2>&1 | grep -q "21\.")
-}
+# --- [01. ANDROID DEVELOPMENT] ---
+check_java21() { [ -d "$JAVA_21_PATH" ] || (command -v java >/dev/null && java -version 2>&1 | grep -q "21\."); }
 install_java21() {
-    echo -e "${C_MINT}Installing OpenJDK 21 LTS via apt...${C_RESET}"
+    echo -e "${C_MINT}Installing OpenJDK 21 LTS...${C_RESET}"
     sudo apt update && sudo apt install -y openjdk-21-jdk
     sync_env
 }
 
-check_android_cmdline() {
-    [ -x "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" ]
+check_java17() { [ -d "$JAVA_17_PATH" ] || (command -v java >/dev/null && java -version 2>&1 | grep -q "17\."); }
+install_java17() {
+    echo -e "${C_MINT}Installing OpenJDK 17 LTS (Gradle fallback)...${C_RESET}"
+    sudo apt update && sudo apt install -y openjdk-17-jdk
+    sync_env
 }
+
+check_android_cmdline() { [ -x "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" ]; }
 install_android_cmdline() {
     echo -e "${C_MINT}Downloading Android Command-Line Tools (sdkmanager)...${C_RESET}"
     mkdir -p "$ANDROID_DIR/cmdline-tools" /tmp
@@ -120,9 +158,7 @@ install_android_cmdline() {
     sync_env
 }
 
-check_android_platform_tools() {
-    [ -x "$ANDROID_DIR/platform-tools/adb" ] || command -v adb >/dev/null 2>&1
-}
+check_android_platform_tools() { [ -x "$ANDROID_DIR/platform-tools/adb" ] || command -v adb >/dev/null 2>&1; }
 install_android_platform_tools() {
     echo -e "${C_MINT}Installing Android Platform-Tools (adb, fastboot)...${C_RESET}"
     check_android_cmdline || install_android_cmdline
@@ -130,9 +166,7 @@ install_android_platform_tools() {
     echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
 }
 
-check_android_platforms() {
-    [ -d "$ANDROID_DIR/platforms/android-36" ] || [ -d "$ANDROID_DIR/platforms/android-34" ]
-}
+check_android_platforms() { [ -d "$ANDROID_DIR/platforms/android-36" ] || [ -d "$ANDROID_DIR/platforms/android-34" ]; }
 install_android_platforms() {
     echo -e "${C_MINT}Installing Android SDK Platforms (API 34 & 36)...${C_RESET}"
     check_android_cmdline || install_android_cmdline
@@ -140,9 +174,7 @@ install_android_platforms() {
     echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "platforms;android-34"
 }
 
-check_android_build_tools() {
-    [ -d "$ANDROID_DIR/build-tools/28.0.3" ] || [ -d "$ANDROID_DIR/build-tools/34.0.0" ]
-}
+check_android_build_tools() { [ -d "$ANDROID_DIR/build-tools/28.0.3" ] || [ -d "$ANDROID_DIR/build-tools/34.0.0" ]; }
 install_android_build_tools() {
     echo -e "${C_MINT}Installing Android Build-Tools (28.0.3 & 34.0.0)...${C_RESET}"
     check_android_cmdline || install_android_cmdline
@@ -150,9 +182,21 @@ install_android_build_tools() {
     echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "build-tools;28.0.3" "build-tools;34.0.0"
 }
 
-check_flutter() {
-    [ -x "$FLUTTER_DIR/bin/flutter" ] || command -v flutter >/dev/null 2>&1
+check_android_ndk() { [ -d "$ANDROID_DIR/ndk" ] && [ "$(ls -A "$ANDROID_DIR/ndk" 2>/dev/null)" ]; }
+install_android_ndk() {
+    echo -e "${C_MINT}Installing Android NDK (Native Development Kit)...${C_RESET}"
+    check_android_cmdline || install_android_cmdline
+    sync_env
+    echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "ndk;26.2.11394342" || echo "y" | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" "ndk-bundle"
 }
+
+check_gradle() { command -v gradle >/dev/null 2>&1; }
+install_gradle() {
+    echo -e "${C_MINT}Installing Gradle Build Tool...${C_RESET}"
+    sudo apt update && sudo apt install -y gradle
+}
+
+check_flutter() { [ -x "$FLUTTER_DIR/bin/flutter" ] || command -v flutter >/dev/null 2>&1; }
 install_flutter() {
     echo -e "${C_MINT}Cloning Flutter SDK (stable channel)...${C_RESET}"
     mkdir -p "$DEV_DIR"
@@ -167,18 +211,22 @@ install_flutter() {
     yes | "$ANDROID_DIR/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
 }
 
-# --- [IOS (LINUX TOOLS)] ---
+check_scrcpy() { command -v scrcpy >/dev/null 2>&1; }
+install_scrcpy() {
+    echo -e "${C_MINT}Installing Scrcpy (Android Screen Mirroring over USB)...${C_RESET}"
+    sudo apt update && sudo apt install -y scrcpy
+}
+
+# --- [02. IOS DEVELOPMENT (LINUX STACK)] ---
 check_usbmuxd() { command -v usbmuxd >/dev/null 2>&1; }
 install_usbmuxd() {
     echo -e "${C_MINT}Installing usbmuxd (USB daemon for iOS devices)...${C_RESET}"
     sudo apt update && sudo apt install -y usbmuxd
 }
 
-check_libimobiledevice() {
-    command -v ideviceinfo >/dev/null 2>&1 || dpkg -s libimobiledevice6 >/dev/null 2>&1
-}
+check_libimobiledevice() { command -v ideviceinfo >/dev/null 2>&1 || dpkg -s libimobiledevice6 >/dev/null 2>&1; }
 install_libimobiledevice() {
-    echo -e "${C_MINT}Installing libimobiledevice communication stack...${C_RESET}"
+    echo -e "${C_MINT}Installing libimobiledevice stack...${C_RESET}"
     sudo apt update && sudo apt install -y libimobiledevice6 libimobiledevice-utils
 }
 
@@ -188,6 +236,18 @@ install_ideviceinstaller() {
     sudo apt update && sudo apt install -y ideviceinstaller
 }
 
+check_ifuse() { command -v ifuse >/dev/null 2>&1; }
+install_ifuse() {
+    echo -e "${C_MINT}Installing ifuse (Mount iOS devices on Linux)...${C_RESET}"
+    sudo apt update && sudo apt install -y ifuse
+}
+
+check_libplist() { command -v plistutil >/dev/null 2>&1; }
+install_libplist() {
+    echo -e "${C_MINT}Installing libplist-utils (Apple Property List Converter)...${C_RESET}"
+    sudo apt update && sudo apt install -y libplist-utils
+}
+
 check_cocoapods() { command -v pod >/dev/null 2>&1; }
 install_cocoapods() {
     echo -e "${C_MINT}Installing Ruby and CocoaPods...${C_RESET}"
@@ -195,7 +255,14 @@ install_cocoapods() {
     sudo gem install cocoapods || true
 }
 
-# --- [WEB DEVELOPMENT] ---
+check_fastlane() { command -v fastlane >/dev/null 2>&1; }
+install_fastlane() {
+    echo -e "${C_MINT}Installing Fastlane (App Deployment Automation)...${C_RESET}"
+    sudo apt update && sudo apt install -y ruby-full build-essential
+    sudo gem install fastlane || true
+}
+
+# --- [03. WEB DEVELOPMENT] ---
 check_nodejs() { command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; }
 install_nodejs() {
     echo -e "${C_MINT}Installing Node.js LTS and npm...${C_RESET}"
@@ -209,9 +276,23 @@ install_pnpm_yarn() {
     sudo npm install -g pnpm yarn
 }
 
+check_bun() { command -v bun >/dev/null 2>&1 || [ -x "$CURRENT_HOME/.bun/bin/bun" ]; }
+install_bun() {
+    echo -e "${C_MINT}Installing Bun (Ultra-Fast JS Runtime & Bundler)...${C_RESET}"
+    curl -fsSL https://bun.sh/install | bash
+    sync_env
+}
+
+check_deno() { command -v deno >/dev/null 2>&1 || [ -x "$CURRENT_HOME/.deno/bin/deno" ]; }
+install_deno() {
+    echo -e "${C_MINT}Installing Deno (Secure TypeScript/JavaScript Runtime)...${C_RESET}"
+    curl -fsSL https://deno.land/install.sh | sh
+    sync_env
+}
+
 check_postgresql() { command -v psql >/dev/null 2>&1; }
 install_postgresql() {
-    echo -e "${C_MINT}Installing PostgreSQL server and client tools...${C_RESET}"
+    echo -e "${C_MINT}Installing PostgreSQL server and client...${C_RESET}"
     sudo apt update && sudo apt install -y postgresql postgresql-contrib
     sudo systemctl enable --now postgresql || true
 }
@@ -223,13 +304,26 @@ install_redis() {
     sudo systemctl enable --now redis-server || true
 }
 
+check_sqlite() { command -v sqlite3 >/dev/null 2>&1; }
+install_sqlite() {
+    echo -e "${C_MINT}Installing SQLite3 and development headers...${C_RESET}"
+    sudo apt update && sudo apt install -y sqlite3 libsqlite3-dev
+}
+
 check_docker() { command -v docker >/dev/null 2>&1; }
 install_docker() {
-    echo -e "${C_MINT}Installing Docker Engine & Docker Compose plugin...${C_RESET}"
+    echo -e "${C_MINT}Installing Docker Engine & Docker Compose...${C_RESET}"
     sudo apt update && sudo apt install -y docker.io docker-compose-plugin docker-compose
     sudo systemctl enable --now docker || true
-    sudo usermod -aG docker "$USER" || true
+    sudo usermod -aG docker "$CURRENT_USER" || true
     echo -e "${C_EMERALD}Docker installed. Group activation applies on new terminal session.${C_RESET}"
+}
+
+check_nginx() { command -v nginx >/dev/null 2>&1; }
+install_nginx() {
+    echo -e "${C_MINT}Installing Nginx Web Server / Reverse Proxy...${C_RESET}"
+    sudo apt update && sudo apt install -y nginx
+    sudo systemctl enable --now nginx || true
 }
 
 check_chrome() { command -v google-chrome >/dev/null 2>&1 || command -v chromium >/dev/null 2>&1; }
@@ -238,13 +332,11 @@ install_chrome() {
     sudo apt update && sudo apt install -y chromium
 }
 
-# --- [AI & MACHINE LEARNING] ---
-check_python_env() {
-    command -v python3 >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1
-}
+# --- [04. AI & MACHINE LEARNING] ---
+check_python_env() { command -v python3 >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; }
 install_python_env() {
     echo -e "${C_MINT}Installing Python 3, pip, and venv tooling...${C_RESET}"
-    sudo apt update && sudo apt install -y python3 python3-pip python3-venv python3-full
+    sudo apt update && sudo apt install -y python3 python3-pip python3-venv python3-full python3-dev
 }
 
 check_ollama() { command -v ollama >/dev/null 2>&1; }
@@ -253,31 +345,49 @@ install_ollama() {
     curl -fsSL https://ollama.com/install.sh | sh
 }
 
-check_jupyter() {
-    command -v jupyter >/dev/null 2>&1 || python3 -c "import jupyterlab" >/dev/null 2>&1
+check_core_ai_stack() { python3 -c "import numpy, pandas, scipy, matplotlib" >/dev/null 2>&1; }
+install_core_ai_stack() {
+    echo -e "${C_MINT}Installing Core AI Stack (NumPy, Pandas, SciPy, Matplotlib, Seaborn)...${C_RESET}"
+    python3 -m pip install --user --upgrade numpy pandas scipy matplotlib seaborn --break-system-packages || true
 }
+
+check_pytorch() { python3 -c "import torch, torchvision" >/dev/null 2>&1; }
+install_pytorch() {
+    echo -e "${C_MINT}Installing PyTorch and Vision Libraries...${C_RESET}"
+    python3 -m pip install --user --upgrade torch torchvision torchaudio --break-system-packages || true
+}
+
+check_ml_suite() { python3 -c "import sklearn" >/dev/null 2>&1; }
+install_ml_suite() {
+    echo -e "${C_MINT}Installing ML Suite (Scikit-Learn, XGBoost, LightGBM)...${C_RESET}"
+    python3 -m pip install --user --upgrade scikit-learn xgboost lightgbm --break-system-packages || true
+}
+
+check_transformers() { python3 -c "import transformers" >/dev/null 2>&1; }
+install_transformers() {
+    echo -e "${C_MINT}Installing NLP & Transformers (Hugging Face, Datasets, Accelerate)...${C_RESET}"
+    python3 -m pip install --user --upgrade transformers datasets tokenizers accelerate --break-system-packages || true
+}
+
+check_vectordb() { python3 -c "import chromadb" >/dev/null 2>&1; }
+install_vectordb() {
+    echo -e "${C_MINT}Installing Vector DB & Embeddings (ChromaDB, Sentence-Transformers)...${C_RESET}"
+    python3 -m pip install --user --upgrade chromadb sentence-transformers --break-system-packages || true
+}
+
+check_jupyter() { command -v jupyter >/dev/null 2>&1 || python3 -c "import jupyterlab" >/dev/null 2>&1; }
 install_jupyter() {
     echo -e "${C_MINT}Installing JupyterLab and Jupyter Notebook...${C_RESET}"
     python3 -m pip install --user --upgrade jupyterlab notebook --break-system-packages || true
 }
 
-check_ai_stack() {
-    python3 -c "import numpy, pandas, sklearn" >/dev/null 2>&1
-}
-install_ai_stack() {
-    echo -e "${C_MINT}Installing Core AI Stack (NumPy, Pandas, Scikit-Learn, PyTorch)...${C_RESET}"
-    python3 -m pip install --user --upgrade numpy pandas scikit-learn matplotlib scipy torch torchvision --break-system-packages || true
-}
-
-check_huggingface() {
-    command -v huggingface-cli >/dev/null 2>&1 || python3 -c "import huggingface_hub" >/dev/null 2>&1
-}
+check_huggingface() { command -v huggingface-cli >/dev/null 2>&1 || python3 -c "import huggingface_hub" >/dev/null 2>&1; }
 install_huggingface() {
     echo -e "${C_MINT}Installing Hugging Face Hub CLI...${C_RESET}"
     python3 -m pip install --user --upgrade "huggingface_hub[cli]" --break-system-packages || true
 }
 
-# --- [DEVELOPMENT SOFTWARES] ---
+# --- [05. DEVELOPMENT SOFTWARES & IDES] ---
 check_vscode() { command -v code >/dev/null 2>&1 || command -v code-oss >/dev/null 2>&1; }
 install_vscode() {
     echo -e "${C_MINT}Installing Visual Studio Code...${C_RESET}"
@@ -320,6 +430,15 @@ EOF
     echo -e "${C_EMERALD}Postman installed successfully.${C_RESET}"
 }
 
+check_insomnia() { command -v insomnia >/dev/null 2>&1; }
+install_insomnia() {
+    echo -e "${C_MINT}Installing Insomnia REST & GraphQL Client...${C_RESET}"
+    local deb_path="/tmp/insomnia.deb"
+    curl -L -o "$deb_path" "https://updates.insomnia.rest/downloads/ubuntu/latest?&app=com.insomnia.app&source=website"
+    sudo apt install -y "$deb_path" || sudo dpkg -i "$deb_path" || sudo apt install -f -y
+    rm -f "$deb_path"
+}
+
 check_dbeaver() { command -v dbeaver >/dev/null 2>&1 || dpkg -s dbeaver-ce >/dev/null 2>&1; }
 install_dbeaver() {
     echo -e "${C_MINT}Installing DBeaver Universal Database Manager...${C_RESET}"
@@ -329,10 +448,30 @@ install_dbeaver() {
     rm -f "$deb_path"
 }
 
+check_lazygit() { command -v lazygit >/dev/null 2>&1; }
+install_lazygit() {
+    echo -e "${C_MINT}Installing Lazygit (Terminal UI for Git)...${C_RESET}"
+    local lg_ver
+    lg_ver=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    if [ -n "$lg_ver" ]; then
+        curl -Lo /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${lg_ver}_Linux_x86_64.tar.gz"
+        sudo tar -xf /tmp/lazygit.tar.gz -C /usr/local/bin lazygit
+        rm -f /tmp/lazygit.tar.gz
+    else
+        sudo apt update && sudo apt install -y lazygit || true
+    fi
+}
+
 check_git_gui() { command -v git-cola >/dev/null 2>&1 || command -v gitk >/dev/null 2>&1; }
 install_git_gui() {
     echo -e "${C_MINT}Installing Git GUI Tools (Git Cola, Gitk)...${C_RESET}"
     sudo apt update && sudo apt install -y git-cola gitk
+}
+
+check_neovim() { command -v nvim >/dev/null 2>&1; }
+install_neovim() {
+    echo -e "${C_MINT}Installing Neovim (Modern Extensible Terminal Editor)...${C_RESET}"
+    sudo apt update && sudo apt install -y neovim
 }
 
 check_tmux_htop() { command -v tmux >/dev/null 2>&1 && command -v htop >/dev/null 2>&1; }
@@ -341,10 +480,8 @@ install_tmux_htop() {
     sudo apt update && sudo apt install -y tmux htop
 }
 
-# --- [CORE SYSTEM & GIT] ---
-check_git_configured() {
-    command -v git >/dev/null 2>&1 && [ -n "$(git config --global user.name 2>/dev/null)" ]
-}
+# --- [06. CORE SYSTEM & DEVOPS / SECURITY] ---
+check_git_configured() { command -v git >/dev/null 2>&1 && [ -n "$(git config --global user.name 2>/dev/null)" ]; }
 install_git_configured() {
     echo -e "${C_MINT}Configuring Git Global Identity...${C_RESET}"
     read -rp "Enter Full Name: " g_name
@@ -354,62 +491,103 @@ install_git_configured() {
     git config --global init.defaultBranch main
 }
 
-check_github_ssh() { [ -f "$HOME/.ssh/id_ed25519" ]; }
+check_github_ssh() { [ -f "$CURRENT_HOME/.ssh/id_ed25519" ]; }
 install_github_ssh() {
     echo -e "${C_MINT}Generating Ed25519 SSH Key for GitHub...${C_RESET}"
     local email
     email=$(git config --global user.email 2>/dev/null || echo "developer@example.com")
-    mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
-    ssh-keygen -t ed25519 -C "$email" -f "$HOME/.ssh/id_ed25519" -N ""
-    chmod 600 "$HOME/.ssh/id_ed25519"
-    chmod 644 "$HOME/.ssh/id_ed25519.pub"
+    mkdir -p "$CURRENT_HOME/.ssh" && chmod 700 "$CURRENT_HOME/.ssh"
+    ssh-keygen -t ed25519 -C "$email" -f "$CURRENT_HOME/.ssh/id_ed25519" -N ""
+    chmod 600 "$CURRENT_HOME/.ssh/id_ed25519"
+    chmod 644 "$CURRENT_HOME/.ssh/id_ed25519.pub"
     echo -e "\n${C_EMERALD}Public Key (Copy to https://github.com/settings/keys):${C_RESET}"
-    cat "$HOME/.ssh/id_ed25519.pub"
+    cat "$CURRENT_HOME/.ssh/id_ed25519.pub"
     echo ""
     read -rp "Press [Enter] to test connection..."
     ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -T git@github.com 2>&1 || true
 }
 
 check_build_essentials() {
-    command -v clang >/dev/null 2>&1 && command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1 && command -v pkg-config >/dev/null 2>&1
+    command -v gcc >/dev/null 2>&1 && command -v clang >/dev/null 2>&1 && command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1
 }
 install_build_essentials() {
-    echo -e "${C_MINT}Installing C/C++ Build Essentials and system libraries...${C_RESET}"
-    sudo apt update && sudo apt install -y clang cmake ninja-build pkg-config build-essential libgtk-3-dev liblzma-dev mesa-utils curl git unzip zip xz-utils
+    echo -e "${C_MINT}Installing C/C++ Build Essentials and system headers...${C_RESET}"
+    sudo apt update && sudo apt install -y build-essential gcc g++ clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev mesa-utils curl git unzip zip xz-utils
+}
+
+check_rust() { command -v rustc >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1; }
+install_rust() {
+    echo -e "${C_MINT}Installing Rust Toolchain (rustup, rustc, cargo)...${C_RESET}"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    sync_env
+}
+
+check_golang() { command -v go >/dev/null 2>&1; }
+install_golang() {
+    echo -e "${C_MINT}Installing Go Programming Language (golang)...${C_RESET}"
+    sudo apt update && sudo apt install -y golang-go
+    sync_env
+}
+
+check_cli_utils() { command -v jq >/dev/null 2>&1 && command -v rg >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1; }
+install_cli_utils() {
+    echo -e "${C_MINT}Installing Modern Developer Utilities (jq, ripgrep, fzf)...${C_RESET}"
+    sudo apt update && sudo apt install -y jq ripgrep fzf
+}
+
+check_net_tools() { command -v nmap >/dev/null 2>&1 && command -v nc >/dev/null 2>&1; }
+install_net_tools() {
+    echo -e "${C_MINT}Installing Network Diagnostic & Security Utilities (nmap, netcat, tcpdump)...${C_RESET}"
+    sudo apt update && sudo apt install -y nmap netcat-openbsd tcpdump
 }
 
 # ==============================================================================
-# TOOL REGISTRY DEFINITION
+# TOOL REGISTRIES
 # ==============================================================================
 TOOLS_ANDROID=(
     "Java 21 LTS (OpenJDK)|check_java21|install_java21"
+    "Java 17 LTS (OpenJDK Legacy Fallback)|check_java17|install_java17"
     "Android Command-Line Tools (sdkmanager)|check_android_cmdline|install_android_cmdline"
     "Android Platform-Tools (adb, fastboot)|check_android_platform_tools|install_android_platform_tools"
     "Android SDK Platform (API 34 & 36)|check_android_platforms|install_android_platforms"
     "Android Build-Tools (28.0.3 & 34.0.0)|check_android_build_tools|install_android_build_tools"
+    "Android NDK (Native C/C++ Kit)|check_android_ndk|install_android_ndk"
+    "Gradle Build Automation Tool|check_gradle|install_gradle"
     "Flutter SDK (Stable Channel)|check_flutter|install_flutter"
+    "Scrcpy (Android Screen Mirroring over USB)|check_scrcpy|install_scrcpy"
 )
 
 TOOLS_IOS=(
     "usbmuxd (USB daemon for iOS devices)|check_usbmuxd|install_usbmuxd"
     "libimobiledevice (iOS communication library)|check_libimobiledevice|install_libimobiledevice"
     "ideviceinstaller (App manager for iOS)|check_ideviceinstaller|install_ideviceinstaller"
+    "ifuse (Mount iOS filesystem on Linux)|check_ifuse|install_ifuse"
+    "libplist-utils (Apple Property List Converter)|check_libplist|install_libplist"
     "CocoaPods (iOS Dependency Manager)|check_cocoapods|install_cocoapods"
+    "Fastlane (Mobile Deployment Automation)|check_fastlane|install_fastlane"
 )
 
 TOOLS_WEB=(
     "Node.js (LTS) & npm Package Manager|check_nodejs|install_nodejs"
     "pnpm & yarn Package Managers|check_pnpm_yarn|install_pnpm_yarn"
+    "Bun (All-in-one JavaScript Runtime & Bundler)|check_bun|install_bun"
+    "Deno (Modern Secure TypeScript/JS Runtime)|check_deno|install_deno"
     "PostgreSQL Database Client & Server|check_postgresql|install_postgresql"
     "Redis Server & In-Memory Store|check_redis|install_redis"
+    "SQLite3 Database Engine & Dev Libraries|check_sqlite|install_sqlite"
     "Docker Engine & Docker Compose|check_docker|install_docker"
+    "Nginx Web Server / Reverse Proxy|check_nginx|install_nginx"
     "Google Chrome / Chromium Browser|check_chrome|install_chrome"
 )
 
 TOOLS_AI=(
     "Python 3, pip, & venv Environment|check_python_env|install_python_env"
     "Ollama (Local LLM Runtime - Llama, DeepSeek)|check_ollama|install_ollama"
-    "Core AI Stack (NumPy, Pandas, PyTorch)|check_ai_stack|install_ai_stack"
+    "Core AI Stack (NumPy, Pandas, SciPy, Matplotlib)|check_core_ai_stack|install_core_ai_stack"
+    "PyTorch Deep Learning Framework|check_pytorch|install_pytorch"
+    "Machine Learning Suite (Scikit-Learn, XGBoost)|check_ml_suite|install_ml_suite"
+    "NLP & Transformers (Hugging Face, Accelerate)|check_transformers|install_transformers"
+    "Vector Database (ChromaDB, Sentence-Transformers)|check_vectordb|install_vectordb"
     "JupyterLab & Notebook Web Interface|check_jupyter|install_jupyter"
     "Hugging Face Hub CLI (huggingface-cli)|check_huggingface|install_huggingface"
 )
@@ -418,15 +596,22 @@ TOOLS_SOFTWARE=(
     "Visual Studio Code (VS Code)|check_vscode|install_vscode"
     "GitHub CLI (gh)|check_gh_cli|install_gh_cli"
     "Postman (API Testing Client)|check_postman|install_postman"
+    "Insomnia (REST & GraphQL Client)|check_insomnia|install_insomnia"
     "DBeaver Community (Universal Database GUI)|check_dbeaver|install_dbeaver"
+    "Lazygit (Terminal UI for Git)|check_lazygit|install_lazygit"
     "Git GUI Tools (Git Cola / Gitk)|check_git_gui|install_git_gui"
+    "Neovim (Modern Extensible Terminal Editor)|check_neovim|install_neovim"
     "Tmux & Htop (Terminal Productivity)|check_tmux_htop|install_tmux_htop"
 )
 
 TOOLS_CORE=(
     "Git CLI & Global Identity Setup|check_git_configured|install_git_configured"
     "GitHub SSH Authentication Key (~/.ssh/id_ed25519)|check_github_ssh|install_github_ssh"
-    "C/C++ Build Essentials (clang, cmake, ninja)|check_build_essentials|install_build_essentials"
+    "C/C++ Build Essentials (gcc, clang, cmake, ninja)|check_build_essentials|install_build_essentials"
+    "Rust Toolchain (rustup, rustc, cargo)|check_rust|install_rust"
+    "Go Programming Language (golang)|check_golang|install_golang"
+    "Developer CLI Utilities (jq, ripgrep, fzf)|check_cli_utils|install_cli_utils"
+    "Network Diagnostic Utilities (nmap, netcat, tcpdump)|check_net_tools|install_net_tools"
 )
 
 get_category_array_name() {
@@ -436,7 +621,7 @@ get_category_array_name() {
         web|3)     echo "TOOLS_WEB" ;;
         ai|4)      echo "TOOLS_AI" ;;
         software|tools|5) echo "TOOLS_SOFTWARE" ;;
-        core|git|6) echo "TOOLS_CORE" ;;
+        core|git|devops|6) echo "TOOLS_CORE" ;;
         *) return 1 ;;
     esac
 }
@@ -447,17 +632,15 @@ get_category_title() {
         ios|2)     echo "IOS DEVELOPMENT (LINUX TOOLS)" ;;
         web|3)     echo "WEB DEVELOPMENT" ;;
         ai|4)      echo "AI & MACHINE LEARNING DEVELOPMENT" ;;
-        software|tools|5) echo "DEVELOPMENT SOFTWARES & TOOLS" ;;
-        core|git|6) echo "CORE SYSTEM TOOLS & GIT" ;;
+        software|tools|5) echo "DEVELOPMENT SOFTWARES & IDES" ;;
+        core|git|devops|6) echo "CORE SYSTEM TOOLS & DEVOPS" ;;
         *) echo "UNKNOWN CATEGORY" ;;
     esac
 }
 
 # ==============================================================================
-# CLI EXECUTION MODES FOR TECH GURUS
+# CLI EXECUTION MODES
 # ==============================================================================
-
-# CLI: Diagnostic scan
 cli_scan() {
     local target_cat="$1"
 
@@ -488,13 +671,13 @@ cli_scan() {
         [ "$missing" -eq 0 ] && exit 0 || exit 1
     fi
 
-    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}COMPREHENSIVE TOOLCHAIN DIAGNOSTIC SCAN${C_RESET}                                   ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}COMPREHENSIVE TOOLCHAIN DIAGNOSTIC SCAN (EXECUTOR: ${CURRENT_USER})${C_RESET}               ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
     echo ""
 
     local categories=("TOOLS_ANDROID" "TOOLS_IOS" "TOOLS_WEB" "TOOLS_AI" "TOOLS_SOFTWARE" "TOOLS_CORE")
-    local titles=("ANDROID DEVELOPMENT" "IOS DEVELOPMENT (LINUX TOOLS)" "WEB DEVELOPMENT" "AI & MACHINE LEARNING" "DEVELOPMENT SOFTWARES" "CORE SYSTEM TOOLS & GIT")
+    local titles=("ANDROID DEVELOPMENT" "IOS DEVELOPMENT (LINUX TOOLS)" "WEB DEVELOPMENT" "AI & MACHINE LEARNING" "DEVELOPMENT SOFTWARES" "CORE SYSTEM TOOLS & DEVOPS")
 
     local total_checked=0
     local total_passed=0
@@ -519,15 +702,14 @@ cli_scan() {
 
     echo -e "${C_WHITE}${C_BOLD}Scan Summary:${C_RESET} ${C_EMERALD}$total_passed${C_RESET} of ${C_WHITE}$total_checked${C_RESET} tools verified."
     if [ "$total_passed" -eq "$total_checked" ]; then
-        echo -e "${C_EMERALD}${C_BOLD}Status: All required developer tools are installed!${C_RESET}"
+        echo -e "${C_EMERALD}${C_BOLD}Status: All required developer tools are verified!${C_RESET}"
         exit 0
     else
-        echo -e "${C_YELLOW}${C_BOLD}Status: Missing tools detected. Run 'dev-wizard' or 'dev-wizard install <cat> <items>' to install.${C_RESET}"
+        echo -e "${C_YELLOW}${C_BOLD}Status: Missing tools detected.${C_RESET}"
         exit 1
     fi
 }
 
-# CLI: Headless installation
 cli_install() {
     local cat_input="$1"
     local tools_input="$2"
@@ -596,37 +778,44 @@ cli_install() {
 
     sync_env
     persist_env
+    auto_stamp_desktop
     echo -e "\n${C_EMERALD}${C_BOLD}[OK] Batch installation completed.${C_RESET}"
 }
 
-# CLI: Install CLI binary into ~/.local/bin
 cli_install_binary() {
-    mkdir -p "$HOME/.local/bin"
-    ln -sf "$REAL_SCRIPT_PATH" "$HOME/.local/bin/dev-wizard"
-    chmod +x "$HOME/.local/bin/dev-wizard"
+    mkdir -p "$CURRENT_HOME/.local/bin" "$CURRENT_HOME/.local/share/applications" "$CURRENT_HOME/Desktop"
+    ln -sf "$REAL_SCRIPT_PATH" "$CURRENT_HOME/.local/bin/dev-wizard"
+    chmod +x "$CURRENT_HOME/.local/bin/dev-wizard"
+    
+    # Stamp desktop launcher dynamically
+    if [ -f "$ROOT_DIR/Dev-Setup-Wizard.desktop" ]; then
+        cp "$ROOT_DIR/Dev-Setup-Wizard.desktop" "$CURRENT_HOME/Desktop/Dev-Setup-Wizard.desktop"
+        cp "$ROOT_DIR/Dev-Setup-Wizard.desktop" "$CURRENT_HOME/.local/share/applications/dev-setup-wizard.desktop"
+        auto_stamp_desktop
+    fi
+    
     persist_env
-    echo -e "${C_EMERALD}${C_BOLD}[OK] 'dev-wizard' has been installed to $HOME/.local/bin/dev-wizard${C_RESET}"
+    echo -e "${C_EMERALD}${C_BOLD}[OK] 'dev-wizard' has been installed to $CURRENT_HOME/.local/bin/dev-wizard${C_RESET}"
+    echo -e "${C_EMERALD}${C_BOLD}[OK] Desktop launcher stamped and signed for user: ${CURRENT_USER}${C_RESET}"
     echo -e "You can now run ${C_WHITE}${C_BOLD}dev-wizard${C_RESET} directly from any terminal directory!"
 }
 
-# CLI: Doctor
 cli_doctor() {
     sync_env
-    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}FLUTTER & ANDROID TOOLCHAIN DOCTOR${C_RESET}                                      ${C_DARK_G}║${C_RESET}"
-    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+    echo -e "${C_DARK_G}╔═══════════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_DARK_G}║${C_RESET}  ${C_EMERALD}${C_BOLD}FLUTTER & ANDROID TOOLCHAIN DOCTOR (USER: ${CURRENT_USER})${C_RESET}                         ${C_DARK_G}║${C_RESET}"
+    echo -e "${C_DARK_G}╚═══════════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
     echo ""
     if command -v flutter >/dev/null 2>&1; then
         flutter doctor -v
     elif [ -x "$FLUTTER_DIR/bin/flutter" ]; then
         "$FLUTTER_DIR/bin/flutter" doctor -v
     else
-        echo -e "${C_RED}Flutter binary not found. Install it via 'dev-wizard install android 6'.${C_RESET}"
+        echo -e "${C_RED}Flutter binary not found. Install it via 'dev-wizard install android 9'.${C_RESET}"
         exit 1
     fi
 }
 
-# CLI: Help page
 cli_help() {
     cat << EOF
 DEV-WIZARD(1)                   User Commands                  DEV-WIZARD(1)
@@ -652,7 +841,7 @@ COMMANDS
         Execute Flutter Doctor and Android toolchain verification.
 
     install-cli
-        Symlink dev-wizard into ~/.local/bin for global system access.
+        Symlink dev-wizard into ~/.local/bin and stamp desktop launchers for current user.
 
     list, -l [CATEGORY]
         Display all registered toolchains and their check functions.
@@ -664,20 +853,12 @@ COMMANDS
         Display dev-wizard version information.
 
 CATEGORIES
-    android     Java 21, cmdline-tools, platform-tools, SDK 34/36, build-tools, Flutter
-    ios         usbmuxd, libimobiledevice, ideviceinstaller, CocoaPods
-    web         Node.js, pnpm, yarn, PostgreSQL, Redis, Docker, Chrome
-    ai          Python3, pip, venv, Ollama, PyTorch, JupyterLab, Hugging Face
-    tools       VS Code, gh CLI, Postman, DBeaver, Git Cola, Tmux & Htop
-    core        Git Config, GitHub SSH Key (~/.ssh/id_ed25519), C/C++ Build Essentials
-
-EXAMPLES
-    dev-wizard
-    dev-wizard scan
-    dev-wizard scan web
-    dev-wizard install web 1,2
-    dev-wizard install ai all
-    dev-wizard doctor
+    android     Java 21/17, cmdline-tools, platform-tools, SDK 34/36, build-tools, NDK, Gradle, Flutter, Scrcpy
+    ios         usbmuxd, libimobiledevice, ideviceinstaller, ifuse, libplist, CocoaPods, Fastlane
+    web         Node.js, pnpm, yarn, Bun, Deno, PostgreSQL, Redis, SQLite3, Docker, Nginx, Chrome
+    ai          Python3, pip, venv, Ollama, PyTorch, Scikit-Learn, Transformers, ChromaDB, JupyterLab, HF CLI
+    tools       VS Code, gh CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux & Htop
+    core        Git Config, SSH Key, C/C++ Essentials, Rust, Go, jq/ripgrep/fzf, Network Tools
 
 AUTHOR
     Mwenda Boniface (https://github.com/Mwenda-Boniface)
@@ -698,7 +879,7 @@ handle_tui_category() {
     while true; do
         draw_banner
         echo -e "${C_DARK_G}┌─[ ${C_EMERALD}${C_BOLD}DISCIPLINE: $cat_title${C_RESET}${C_DARK_G} ]${C_RESET}"
-        echo -e "${C_DARK_G}│${C_RESET} ${C_GRAY}Scanning toolchain state...${C_RESET}"
+        echo -e "${C_DARK_G}│${C_RESET} ${C_GRAY}Scanning toolchain state for ${CURRENT_USER}...${C_RESET}"
         echo -e "${C_DARK_G}│${C_RESET}"
 
         local installed_count=0
@@ -722,9 +903,9 @@ handle_tui_category() {
             fi
         done
 
-        echo -e "${C_DARK_G}├───────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+        echo -e "${C_DARK_G}├───────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
         echo -e "${C_DARK_G}│${C_RESET}  ${C_BOLD}Status:${C_RESET} ${C_EMERALD}$installed_count${C_RESET} of ${C_WHITE}$total_tools${C_RESET} tools verified."
-        echo -e "${C_DARK_G}└───────────────────────────────────────────────────────────────────────────┘${C_RESET}"
+        echo -e "${C_DARK_G}└───────────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
 
         if [ ${#uninstalled_names[@]} -eq 0 ]; then
             echo -e "\n  ${C_EMERALD}${C_BOLD}[OK] All tools in this discipline are verified and active.${C_RESET}\n"
@@ -750,13 +931,13 @@ handle_tui_category() {
         fi
 
         echo -e "\n  ${C_WHITE}${C_BOLD}Select uninstalled tools to provision:${C_RESET}"
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
         for u_idx in "${!uninstalled_names[@]}"; do
             echo -e "  ${C_MINT}[ $((u_idx + 1)) ]${C_RESET} ${C_BOLD}${uninstalled_names[$u_idx]}${C_RESET}"
         done
         echo -e "  ${C_EMERALD}[ A ]${C_RESET} ${C_BOLD}Install ALL uninstalled tools listed above${C_RESET}"
         echo -e "  ${C_GRAY}[ 0 ] Return to Main Menu${C_RESET}"
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
         echo ""
         echo -e "  ${C_GRAY}Enter numbers separated by commas (e.g. 1,2 or 1,3 or 'A' or '0'):${C_RESET}"
         echo -n "  >>> "
@@ -774,6 +955,7 @@ handle_tui_category() {
             done
             sync_env
             persist_env
+            auto_stamp_desktop
             echo -e "\n${C_EMERALD}${C_BOLD}[OK] Batch provisioning completed successfully.${C_RESET}"
             pause
             continue
@@ -796,44 +978,42 @@ handle_tui_category() {
         if [ "$count" -gt 0 ]; then
             sync_env
             persist_env
+            auto_stamp_desktop
             echo -e "\n${C_EMERALD}${C_BOLD}[OK] Provisioning complete.${C_RESET}"
             pause
         fi
     done
 }
 
-# ==============================================================================
-# MAIN INTERACTIVE TUI LOOP
-# ==============================================================================
 tui_main() {
     while true; do
         draw_banner
         echo -e "  ${C_WHITE}${C_BOLD}Select a toolchain discipline to inspect or provision:${C_RESET}"
         echo ""
         echo -e "  ${C_EMERALD}[ 01 ]${C_RESET} ${C_BOLD}Android Development${C_RESET}"
-        echo -e "         ${C_GRAY}Flutter, Java 21, cmdline-tools, platform SDKs 34/36, build-tools${C_RESET}"
+        echo -e "         ${C_GRAY}Java 21/17, cmdline-tools, platform-tools, SDK 34/36, build-tools, NDK, Flutter, Scrcpy${C_RESET}"
         echo ""
         echo -e "  ${C_EMERALD}[ 02 ]${C_RESET} ${C_BOLD}iOS Development (Linux Compatibility Stack)${C_RESET}"
-        echo -e "         ${C_GRAY}usbmuxd, libimobiledevice, ideviceinstaller, CocoaPods${C_RESET}"
+        echo -e "         ${C_GRAY}usbmuxd, libimobiledevice, ideviceinstaller, ifuse, plist-utils, CocoaPods, Fastlane${C_RESET}"
         echo ""
         echo -e "  ${C_EMERALD}[ 03 ]${C_RESET} ${C_BOLD}Web Development${C_RESET}"
-        echo -e "         ${C_GRAY}Node.js, npm, pnpm, yarn, PostgreSQL, Redis, Docker, Chrome${C_RESET}"
+        echo -e "         ${C_GRAY}Node.js, npm, pnpm, yarn, Bun, Deno, PostgreSQL, Redis, SQLite3, Docker, Nginx, Chrome${C_RESET}"
         echo ""
         echo -e "  ${C_EMERALD}[ 04 ]${C_RESET} ${C_BOLD}AI & Machine Learning Development${C_RESET}"
-        echo -e "         ${C_GRAY}Python 3, Ollama (Local LLMs), PyTorch, NumPy, JupyterLab, Hugging Face${C_RESET}"
+        echo -e "         ${C_GRAY}Python 3, Ollama, PyTorch, Scikit-Learn, Transformers, ChromaDB, JupyterLab, HF CLI${C_RESET}"
         echo ""
         echo -e "  ${C_EMERALD}[ 05 ]${C_RESET} ${C_BOLD}Development Softwares & IDEs${C_RESET}"
-        echo -e "         ${C_GRAY}VS Code, GitHub CLI (gh), Postman, DBeaver, Git Cola, Tmux & Htop${C_RESET}"
+        echo -e "         ${C_GRAY}VS Code, GitHub CLI, Postman, Insomnia, DBeaver, Lazygit, Git Cola, Neovim, Tmux${C_RESET}"
         echo ""
-        echo -e "  ${C_EMERALD}[ 06 ]${C_RESET} ${C_BOLD}Core System Tools & Git / GitHub${C_RESET}"
-        echo -e "         ${C_GRAY}Git Identity, GitHub SSH Key (~/.ssh/id_ed25519), C/C++ Build Essentials${C_RESET}"
+        echo -e "  ${C_EMERALD}[ 06 ]${C_RESET} ${C_BOLD}Core System Tools & DevOps / Security${C_RESET}"
+        echo -e "         ${C_GRAY}Git Identity, SSH Key, C/C++ Build Essentials, Rust, Go, jq/ripgrep/fzf, Nmap${C_RESET}"
         echo ""
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
         echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_BOLD}Run Full System Diagnostic Scan (All Categories)${C_RESET}"
         echo -e "  ${C_WHITE}[ D ]${C_RESET} ${C_BOLD}Run Flutter Doctor Diagnostic${C_RESET}"
-        echo -e "  ${C_WHITE}[ C ]${C_RESET} ${C_BOLD}Install 'dev-wizard' to ~/.local/bin (Global CLI Access)${C_RESET}"
+        echo -e "  ${C_WHITE}[ C ]${C_RESET} ${C_BOLD}Install 'dev-wizard' to ~/.local/bin (Permanent Executor Setup)${C_RESET}"
         echo -e "  ${C_GRAY}[ 0 ] Exit${C_RESET}"
-        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "  ${C_DARK_G}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
         echo ""
         echo -n "  Enter choice [1-6, S, D, C, 0]: "
         read -r choice || exit 0
@@ -843,8 +1023,8 @@ tui_main() {
             2|02) handle_tui_category "IOS DEVELOPMENT (LINUX TOOLS)" "TOOLS_IOS" ;;
             3|03) handle_tui_category "WEB DEVELOPMENT" "TOOLS_WEB" ;;
             4|04) handle_tui_category "AI & MACHINE LEARNING" "TOOLS_AI" ;;
-            5|05) handle_tui_category "DEVELOPMENT SOFTWARES" "TOOLS_SOFTWARE" ;;
-            6|06) handle_tui_category "CORE SYSTEM TOOLS & GIT" "TOOLS_CORE" ;;
+            5|05) handle_tui_category "DEVELOPMENT SOFTWARES & IDES" "TOOLS_SOFTWARE" ;;
+            6|06) handle_tui_category "CORE SYSTEM TOOLS & DEVOPS" "TOOLS_CORE" ;;
             [sS]) cli_scan "" ;;
             [dD]) cli_doctor ;;
             [cC]) cli_install_binary; pause ;;
@@ -880,7 +1060,7 @@ case "$1" in
         cli_scan "$2"
         ;;
     --version|-v)
-        echo "dev-wizard version 2.1.0 (x86_64-linux-gnu)"
+        echo "dev-wizard version 2.2.0 (x86_64-linux-gnu)"
         exit 0
         ;;
     --help|-h|help)
