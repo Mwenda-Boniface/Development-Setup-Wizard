@@ -1,6 +1,6 @@
 # 02 // CLI Command Manual
 
-`dev-wizard` provides a complete headless command-line interface suitable for script automation, CI/CD pipelines, and command-line power users.
+`ghost-stack` provides a complete headless command-line interface suitable for script automation, CI/CD pipelines, and command-line power users.
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### 1. Interactive TUI Mode
 ```bash
-dev-wizard
+ghost-stack
 ```
 Launches the full interactive terminal user interface with glowing emerald aesthetic, numbered selection, and diagnostic frames.
 
@@ -19,22 +19,22 @@ Runs check functions against installed packages and outputs status badges.
 
 ```bash
 # Scan all categories across the entire machine:
-dev-wizard scan
+ghost-stack scan
 
 # Scan only Android and mobile tools:
-dev-wizard scan android
+ghost-stack scan android
 
 # Scan only web development stack:
-dev-wizard scan web
+ghost-stack scan web
 
 # Scan only AI & Machine Learning environment:
-dev-wizard scan ai
+ghost-stack scan ai
 
 # Scan only Developer Software & IDEs:
-dev-wizard scan tools
+ghost-stack scan tools
 
 # Scan Core System & DevOps:
-dev-wizard scan core
+ghost-stack scan core
 ```
 
 *Exit Codes:* Returns `0` if all tools in the scanned category are verified; returns `1` if any tool is missing.
@@ -45,26 +45,26 @@ dev-wizard scan core
 Installs uninstalled tools directly from the terminal without interactive prompts.
 
 ```bash
-# Syntax: dev-wizard install <category> <indices|all>
+# Syntax: ghost-stack install <category> <indices|all>
 
 # Install all missing tools in Web Development:
-dev-wizard install web all
+ghost-stack install web all
 
 # Install specific missing tools in Web Development by index:
-dev-wizard install web 1,3,4
+ghost-stack install web 1,3,4
 
 # Install all missing AI/ML tools:
-dev-wizard install ai all
+ghost-stack install ai all
 
 # Install specific Android tools:
-dev-wizard install android 1,2,5
+ghost-stack install android 1,2,5
 ```
 
 ---
 
 ### 4. Verification & Diagnostics (`doctor` or `-d`)
 ```bash
-dev-wizard doctor
+ghost-stack doctor
 ```
 Runs `flutter doctor -v` and inspects Android SDK, Java 21, platform-tools, and desktop build toolchains.
 
@@ -72,6 +72,6 @@ Runs `flutter doctor -v` and inspects Android SDK, Java 21, platform-tools, and 
 
 ### 5. System Integration (`install-cli`)
 ```bash
-dev-wizard install-cli
+ghost-stack install-cli
 ```
-Installs a symlink to `~/.local/bin/dev-wizard`, re-signs the desktop launcher checksum for the current user, and ensures environment variables are exported in `~/.zshrc` and `~/.bashrc`.
+Installs a symlink to `~/.local/bin/ghost-stack`, re-signs the desktop launcher checksum for the current user, and ensures environment variables are exported in `~/.zshrc` and `~/.bashrc`.

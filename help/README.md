@@ -1,6 +1,6 @@
-# DEV-WIZARD // Documentation & Navigation Manual
+# GHOST-STACK // Documentation & Navigation Manual
 
-Welcome to the **Dev-Wizard** official documentation center. This directory contains detailed technical guides and user manuals to help you navigate, customize, and automate the toolchain orchestrator.
+Welcome to the **Ghost-Stack** official documentation center. This directory contains structured technical guides and user manuals to help you navigate, customize, and automate the toolchain orchestrator.
 
 ---
 
@@ -17,8 +17,9 @@ Welcome to the **Dev-Wizard** official documentation center. This directory cont
 
 ## Fast Navigation Quicklinks
 
-- **Launch Interactive Menu:** Run `dev-wizard` or `./run.sh` or double-click the desktop launcher.
-- **Run Diagnostic Check:** Run `dev-wizard scan`
-- **Install All Missing AI Tools:** Run `dev-wizard install ai all`
-- **Verify Flutter & Android:** Run `dev-wizard doctor`
-- **View In-Terminal Help:** Run `dev-wizard --help` or select `[ H ]` in the interactive menu.
+- **Launch Interactive Menu:** Run `ghost-stack` or `./run.sh` or double-click the desktop launcher.
+- **Run Diagnostic Check:** Run `ghost-stack scan`
+- **Install All Missing Web Tools:** Run `ghost-stack install web all`
+- **Install All Missing AI Tools:** Run `ghost-stack install ai all`
+- **Verify Flutter & Android:** Run `ghost-stack doctor`
+- **View In-Terminal Help:** Run `ghost-stack --help` or select `[ H ]` in the interactive menu.

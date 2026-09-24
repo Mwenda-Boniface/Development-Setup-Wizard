@@ -1,6 +1,6 @@
 # 03 // Toolchain Catalog & Discipline Details
 
-`dev-wizard` organizes modern software development tools into 6 primary disciplines:
+`ghost-stack` organizes modern software development tools into 6 primary disciplines:
 
 ---
 

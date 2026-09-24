@@ -1,5 +1,5 @@
 # ==============================================================================
-# Makefile for Dev-Wizard CLI & TUI Suite
+# Makefile for Ghost-Stack CLI & TUI Suite
 # ==============================================================================
 
 PREFIX ?= $(HOME)/.local
@@ -11,9 +11,9 @@ DESKTOPDIR ?= $(HOME)/.local/share/applications
 all: help
 
 help:
-	@echo "Dev-Wizard Build & Installation Targets:"
-	@echo "  make install     - Install 'dev-wizard' command into $(BINDIR)"
-	@echo "  make uninstall   - Remove 'dev-wizard' from $(BINDIR)"
+	@echo "Ghost-Stack Build & Installation Targets:"
+	@echo "  make install     - Install 'ghost-stack' & 'dev-wizard' into $(BINDIR)"
+	@echo "  make uninstall   - Remove 'ghost-stack' from $(BINDIR)"
 	@echo "  make run         - Run interactive TUI directly"
 	@echo "  make scan        - Run headless full system scan"
 	@echo "  make doctor      - Run Flutter/Android doctor diagnostics"
@@ -21,27 +21,28 @@ help:
 
 install:
 	@mkdir -p $(BINDIR) $(DESKTOPDIR)
-	@chmod +x bin/dev-wizard launch.sh
-	@ln -sf $(CURDIR)/bin/dev-wizard $(BINDIR)/dev-wizard
+	@chmod +x bin/ghost-stack launch.sh run.sh
+	@ln -sf $(CURDIR)/bin/ghost-stack $(BINDIR)/ghost-stack
+	@ln -sf $(CURDIR)/bin/ghost-stack $(BINDIR)/dev-wizard
 	@cp Dev-Setup-Wizard.desktop $(DESKTOPDIR)/dev-setup-wizard.desktop 2>/dev/null || true
 	@which update-desktop-database >/dev/null 2>&1 && update-desktop-database $(DESKTOPDIR) || true
-	@echo "[OK] 'dev-wizard' successfully installed to $(BINDIR)/dev-wizard"
-	@echo "You can now run 'dev-wizard' from anywhere in your terminal!"
+	@echo "[OK] 'ghost-stack' successfully installed to $(BINDIR)/ghost-stack"
+	@echo "You can now run 'ghost-stack' from anywhere in your terminal!"
 
 uninstall:
-	@rm -f $(BINDIR)/dev-wizard
+	@rm -f $(BINDIR)/ghost-stack $(BINDIR)/dev-wizard
 	@rm -f $(DESKTOPDIR)/dev-setup-wizard.desktop
-	@echo "[OK] 'dev-wizard' uninstalled."
+	@echo "[OK] 'ghost-stack' uninstalled."
 
 run:
-	@./bin/dev-wizard
+	@./bin/ghost-stack
 
 scan:
-	@./bin/dev-wizard scan
+	@./bin/ghost-stack scan
 
 doctor:
-	@./bin/dev-wizard doctor
+	@./bin/ghost-stack doctor
 
 test:
-	@bash -n bin/dev-wizard
+	@bash -n bin/ghost-stack
 	@echo "[OK] Syntax check passed."

@@ -6,7 +6,7 @@
 **Solution:**
 XFCE and Thunar require a security checksum metadata attribute. Run:
 ```bash
-dev-wizard install-cli
+ghost-stack install-cli
 ```
 Or execute:
 ```bash
@@ -16,8 +16,8 @@ Or simply click the button **"Mark As Secure And Launch"** on the prompt dialog 
 
 ---
 
-## 2. "command not found: dev-wizard"
-**Issue:** Typing `dev-wizard` in a fresh terminal shell outputs `command not found`.
+## 2. "command not found: ghost-stack"
+**Issue:** Typing `ghost-stack` in a fresh terminal shell outputs `command not found`.
 
 **Solution:**
 Ensure `~/.local/bin` is in your shell `PATH`. Run:
@@ -39,7 +39,7 @@ Or run `make install` from the repository directory.
 ```
 
 **Solution:**
-This is harmless and occurs when both system `adb` and Android SDK `platform-tools` are present. Ensure `~/Android/Sdk/platform-tools` is placed first in your `PATH` (which `dev-wizard` automatically configures).
+This is harmless and occurs when both system `adb` and Android SDK `platform-tools` are present. Ensure `~/Android/Sdk/platform-tools` is placed first in your `PATH` (which `ghost-stack` automatically configures).
 
 ---
 
