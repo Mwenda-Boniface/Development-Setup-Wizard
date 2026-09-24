@@ -368,23 +368,23 @@ draw_home_telemetry() {
         printf "  ${C_GRAY}│${C_RESET}  ${C_MINT}[*] Mode :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_MINT}[*] Path :${C_RESET} ${C_WHITE}%-14s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$s_mode" "$s_path"
         echo -e "  ${C_GRAY}└────────────────────────────────────────────────────────┘${C_RESET}"
     else
-        # 3. Mobile Phone / Termux Portrait Mode (< 65 cols): Ultra-Compact Mobile 2-Column Grid (38-40 chars)
+        # 3. Mobile Phone / Termux Portrait Mode (< 65 cols): Ultra-Compact Mobile 2-Column Grid (38-39 chars)
         local m_arch="$ARCH"
         local m_cpu="$cpu_speed"
         local m_os="Termux"
         local m_user="$CURRENT_USER"
         local m_ram
-        m_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}')
-        [ -z "$m_ram" ] && m_ram="2.5G/3.7G"
+        m_ram=$(echo "$mem_info" | awk '{print $1 "/" $3}' | sed 's/Gi/G/g; s/Mi/M/g')
+        [ -z "$m_ram" ] && m_ram="2.4G/3.7G"
         local m_disk
-        m_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}')
+        m_disk=$(echo "$disk_info" | awk '{print $1 "/" $3}' | sed 's/Gi/G/g; s/Mi/M/g')
         [ -z "$m_disk" ] && m_disk="43G/113G"
 
-        echo -e "  ${C_GRAY}┌──[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]─────────────────┐${C_RESET}"
-        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}[*] Arch :${C_RESET} ${C_WHITE}%-9s${C_RESET} ${C_MINT}[*] CPU :${C_RESET} ${C_WHITE}%-9s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$m_arch" "$m_cpu"
-        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}[*] OS   :${C_RESET} ${C_WHITE}%-9s${C_RESET} ${C_MINT}[*] User:${C_RESET} ${C_WHITE}%-9s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$m_os" "$m_user"
-        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}[*] RAM  :${C_RESET} ${C_WHITE}%-9s${C_RESET} ${C_MINT}[*] Disk:${C_RESET} ${C_WHITE}%-9s${C_RESET} ${C_GRAY}│${C_RESET}\n" "$m_ram" "$m_disk"
-        echo -e "  ${C_GRAY}└──────────────────────────────────────┘${C_RESET}"
+        echo -e "  ${C_GRAY}┌─[ ${C_WHITE}${C_BOLD}SYSTEM TELEMETRY${C_RESET} ${C_GRAY}]──────────────┐${C_RESET}"
+        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "Arch" "$m_arch" "CPU" "$m_cpu"
+        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "OS" "$m_os" "User" "$m_user"
+        printf "  ${C_GRAY}│${C_RESET} ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-9.9s${C_RESET}   ${C_MINT}%-4s:${C_RESET} ${C_WHITE}%-8.8s${C_RESET}  ${C_GRAY}│${C_RESET}\n" "RAM" "$m_ram" "Disk" "$m_disk"
+        echo -e "  ${C_GRAY}└───────────────────────────────────┘${C_RESET}"
     fi
     echo ""
 }
@@ -1344,11 +1344,21 @@ render_help_troubleshooting() {
 handle_help_menu() {
     while true; do
         draw_banner
-        echo -e "       ${C_WHITE}${C_BOLD}[ + ]   H E L P   &   N A V I G A T I O N   M A N U A L   [ + ]${C_RESET}\n"
-        echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Getting Started & Installation Guide${C_RESET}"
-        echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}CLI Commands & Headless Automation Reference${C_RESET}"
-        echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Toolchain Catalog & Discipline Details${C_RESET}"
-        echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}Troubleshooting & FAQ${C_RESET}"
+        local t_cols
+        t_cols=$(get_current_cols)
+        if [ "$t_cols" -ge 65 ]; then
+            echo -e "       ${C_WHITE}${C_BOLD}[ + ]   H E L P   &   N A V I G A T I O N   M A N U A L   [ + ]${C_RESET}\n"
+            echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Getting Started & Installation Guide${C_RESET}"
+            echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}CLI Commands & Headless Automation Reference${C_RESET}"
+            echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Toolchain Catalog & Discipline Details${C_RESET}"
+            echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}Troubleshooting & FAQ${C_RESET}"
+        else
+            echo -e "  ${C_WHITE}${C_BOLD}[+] HELP & NAVIGATION MANUAL [+]${C_RESET}\n"
+            echo -e "  ${C_WHITE}[ 1 ]${C_RESET} ${C_LIGHT_G}Getting Started & Installation${C_RESET}"
+            echo -e "  ${C_WHITE}[ 2 ]${C_RESET} ${C_LIGHT_G}CLI Commands & Automation${C_RESET}"
+            echo -e "  ${C_WHITE}[ 3 ]${C_RESET} ${C_LIGHT_G}Toolchain Catalog & Details${C_RESET}"
+            echo -e "  ${C_WHITE}[ 4 ]${C_RESET} ${C_LIGHT_G}Troubleshooting & FAQ${C_RESET}"
+        fi
         echo -e "  ${C_WHITE}[ M ]${C_RESET} ${C_LIGHT_G}Return to Main Menu${C_RESET}"
         echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_GRAY}Exit Ghost-Stack${C_RESET}"
         echo ""
@@ -1605,7 +1615,7 @@ tui_main() {
             echo -e "  ${C_WHITE}[ R ]${C_RESET} ${C_LIGHT_G}Refresh Screen${C_RESET}"
             echo -e "  ${C_WHITE}[ 0 ]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
         else
-            echo -e "  ${C_WHITE}[ S ]${C_RESET} ${C_LIGHT_G}Scan${C_RESET}  ${C_WHITE}[ D ]${C_RESET} ${C_LIGHT_G}Doc${C_RESET}  ${C_WHITE}[ H ]${C_RESET} ${C_LIGHT_G}Help${C_RESET}  ${C_WHITE}[ 0 ]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
+            echo -e "  ${C_WHITE}[S]${C_RESET} ${C_LIGHT_G}Scan${C_RESET}  ${C_WHITE}[D]${C_RESET} ${C_LIGHT_G}Doc${C_RESET}  ${C_WHITE}[H]${C_RESET} ${C_LIGHT_G}Help${C_RESET}  ${C_WHITE}[0]${C_RESET} ${C_LIGHT_G}Exit${C_RESET}"
         fi
         echo ""
         echo -ne "  ${C_LIGHT_G}${C_BOLD}ghost-stack > ${C_RESET}"
