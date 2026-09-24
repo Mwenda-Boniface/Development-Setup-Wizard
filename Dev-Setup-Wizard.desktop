@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Dev Environment Setup Wizard
+Comment=Modular Dev-Environment Toolchain Manager
+Exec=/home/bonnie/Desktop/WINK-DATING-APP/setup-wizard/launch.sh
+Icon=utilities-terminal
+Path=/home/bonnie/Desktop/WINK-DATING-APP/setup-wizard
+Terminal=false
+Categories=Development;
+StartupNotify=true
